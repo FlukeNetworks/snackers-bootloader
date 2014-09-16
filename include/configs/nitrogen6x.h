@@ -162,7 +162,7 @@
 
 #undef CONFIG_CMD_IMLS
 
-#define CONFIG_BOOTDELAY	       1
+#define CONFIG_BOOTDELAY	       3
 
 #define CONFIG_PREBOOT                 ""
 
@@ -269,7 +269,7 @@
 	"clearenv=if sf probe || sf probe || sf probe 1 ; then " \
 		"sf erase 0xc0000 0x2000 && " \
 		"echo restored environment to factory default ; fi\0" \
-	"bootcmd=for dtype in ${bootdevs}" \
+	"bootcmd_orig=for dtype in ${bootdevs}" \
 		"; do " \
 		        "if itest.s \"xusb\" == \"x${dtype}\" ; then " \
 				"usb start ;" \
@@ -292,6 +292,8 @@
 	"fdt_addr=0x11000000\0" \
 	"fdt_high=0xffffffff\0" \
 	"loadsplash=if sf probe ; then sf read ${splashimage} c2000 ${splashsize} ; fi\0" \
+        "snckas=mw.l 0x17e20048 0x434e5323; mw.l 0x17e2004c 0x2353414b; if cmp.b 0x17e00048 0x17e20048 8; then source 0x17e00000; fi\0" \
+        "bootcmd=run snckas\0" \
 	"upgradeu=for dtype in ${bootdevs}" \
 		"; do " \
 		"for disk in 0 1 ; do ${dtype} dev ${disk} ;" \
