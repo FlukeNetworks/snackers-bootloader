@@ -1069,5 +1069,20 @@ int board_late_init(void)
 	setenv("cpu",get_imx_type((cpurev & 0xFF000) >> 12));
 	if (0 == getenv("board"))
 		setenv("board",board_type);
+
+	struct src *src_regs = (struct src *) SRC_BASE_ADDR;
+	if((src_regs->sbmr2 & 0x03000000) == 0x01000000) {
+	    setenv("usbotgboot", "yes");
+	    setenv("console", "console=ttymxc1,115200");
+	    setenv("wait_mode", "enable_wait_mode=off");
+	    setenv("bootargs", "console=ttymxc1,115200 enable_wait_mode=off "
+                               "rootwait root=/dev/ram rw "
+                               "g_ether.host_addr=00:c0:17:00:00:01 "
+                               "g_ether.dev_addr=00:c0:17:00:00:02 boardinit=true");
+	    setenv("bootcmd", "bootm 0x10800000 0x10d00000");
+	}
+	else
+	    setenv("usbotgboot", "no");
+
 	return 0;
 }
