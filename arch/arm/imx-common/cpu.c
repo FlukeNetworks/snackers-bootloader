@@ -57,6 +57,24 @@ char *get_reset_cause(void)
 	}
 }
 
+char *get_boot_mode(void)
+{
+	u32 bootmode;
+
+	struct src *src_regs = (struct src *)SRC_BASE_ADDR;
+
+	bootmode = readl(&src_regs->sbmr2) & 0x03000000;
+	switch (bootmode) {
+	case 0x00000000:
+		return "SPI-NOR";
+	case 0x01000000:
+		return "USB OTG";
+	default:
+		return "unknown bootmode";
+	}
+}
+
+
 #if defined(CONFIG_MX53) || defined(CONFIG_MX6)
 #if defined(CONFIG_MX53)
 #define MEMCTL_BASE	ESDCTL_BASE_ADDR
@@ -143,6 +161,11 @@ int print_cpuinfo(void)
 		(cpurev & 0x0000F) >> 0,
 		mxc_get_clock(MXC_ARM_CLK) / 1000000);
 	printf("Reset cause: %s\n", get_reset_cause());
+	printf("Boot mode:   %s\n", get_boot_mode());
+        if(getenv("bootcmd")) {
+            printf("Bootcmd: %s\n", getenv("bootcmd"));
+            setenv("bootcmd2", "test test test");
+        }
 	return 0;
 }
 #endif
