@@ -1078,7 +1078,7 @@ int board_late_init(void)
 	    setenv("bootargs", "console=ttymxc1,115200 enable_wait_mode=off "
                                "rootwait root=/dev/ram rw "
                                "g_ether.host_addr=00:c0:17:00:00:01 "
-                               "g_ether.dev_addr=00:c0:17:00:00:02 boardinit=true");
+                               "g_ether.dev_addr=00:c0:17:00:00:02 usbotgboot");
 	    setenv("bootcmd", "bootm 0x10800000 0x10d00000");
 	}
 	else
