@@ -17,6 +17,8 @@
 #include <asm/gpio.h>
 #include <asm/imx-common/iomux-v3.h>
 #include <asm/imx-common/mxc_i2c.h>
+#include <asm/imx-common/spi.h>
+#include <asm/imx-common/video.h>
 #include <asm/imx-common/boot_mode.h>
 #include <mmc.h>
 #include <fsl_esdhc.h>
@@ -30,7 +32,7 @@
 #include <i2c.h>
 #include <spi.h>
 #include <input.h>
-#include <splash.h>
+#include <usb/ehci-fsl.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -40,6 +42,10 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define USDHC_PAD_CTRL (PAD_CTL_PUS_47K_UP |			\
 	PAD_CTL_SPEED_LOW | PAD_CTL_DSE_80ohm |			\
+	PAD_CTL_SRE_FAST  | PAD_CTL_HYS)
+
+#define USDHC4_PAD_CTRL (PAD_CTL_PUS_47K_UP |			\
+	PAD_CTL_SPEED_LOW | PAD_CTL_DSE_40ohm |			\
 	PAD_CTL_SRE_FAST  | PAD_CTL_HYS)
 
 #define ENET_PAD_CTRL  (PAD_CTL_PUS_100K_UP |			\
@@ -118,7 +124,14 @@ static struct i2c_pads_info i2c_pad_info2 = {
 	}
 };
 
-static iomux_v3_cfg_t const usdhc3_pads[] = {
+static iomux_v3_cfg_t const usdhc_pads[] = {
+	MX6_PAD_SD4_CLK__SD4_CLK   | MUX_PAD_CTRL(USDHC4_PAD_CTRL),
+	MX6_PAD_SD4_CMD__SD4_CMD   | MUX_PAD_CTRL(USDHC4_PAD_CTRL),
+	MX6_PAD_SD4_DAT0__SD4_DATA0 | MUX_PAD_CTRL(USDHC4_PAD_CTRL),
+	MX6_PAD_SD4_DAT1__SD4_DATA1 | MUX_PAD_CTRL(USDHC4_PAD_CTRL),
+	MX6_PAD_SD4_DAT2__SD4_DATA2 | MUX_PAD_CTRL(USDHC4_PAD_CTRL),
+	MX6_PAD_SD4_DAT3__SD4_DATA3 | MUX_PAD_CTRL(USDHC4_PAD_CTRL),
+	MX6_PAD_NANDF_D6__GPIO2_IO06    | MUX_PAD_CTRL(NO_PAD_CTRL), /* CD */
 	MX6_PAD_SD3_CLK__SD3_CLK   | MUX_PAD_CTRL(USDHC_PAD_CTRL),
 	MX6_PAD_SD3_CMD__SD3_CMD   | MUX_PAD_CTRL(USDHC_PAD_CTRL),
 	MX6_PAD_SD3_DAT0__SD3_DATA0 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
@@ -233,8 +246,14 @@ int board_ehci_hcd_init(int port)
 	return 0;
 }
 
-static struct fsl_esdhc_cfg usdhc_cfg = {
-	USDHC3_BASE_ADDR,
+static struct fsl_esdhc_cfg usdhc_cfgs[] = {
+	{.esdhc_base= USDHC4_BASE_ADDR, .max_bus_width=4},
+	{.esdhc_base= USDHC3_BASE_ADDR, .max_bus_width=8}
+};
+
+static int usdhc_clocks[] = {
+        MXC_ESDHC4_CLK,
+        MXC_ESDHC3_CLK
 };
 
 int board_mmc_getcd(struct mmc *mmc)
@@ -244,19 +263,26 @@ int board_mmc_getcd(struct mmc *mmc)
 
 int board_mmc_init(bd_t *bis)
 {
-	int status = 0;
-	usdhc_cfg.sdhc_clk = mxc_get_clock(MXC_ESDHC3_CLK);
-	usdhc_cfg.max_bus_width = 8;
+	int i, status = 0;
 	imx_iomux_v3_setup_multiple_pads(
-		usdhc3_pads, ARRAY_SIZE(usdhc3_pads));
+		usdhc_pads, ARRAY_SIZE(usdhc_pads));
 
-	status |= fsl_esdhc_initialize(bis, &usdhc_cfg);
-	return 0;
+	for (i=0; i < ARRAY_SIZE(usdhc_cfgs); i++) {
+		usdhc_cfgs[i].sdhc_clk = mxc_get_clock(usdhc_clocks[i]);
+		status |= fsl_esdhc_initialize(bis, &usdhc_cfgs[i]);
+	}
+	printf("%s: status = 0x%x\n", __func__, status);
+	return status;
+}
+
+int board_spi_cs_gpio(unsigned bus, unsigned cs)
+{
+	return (bus == 0 && cs == 0) ? (IMX_GPIO_NR(3, 19)) : -1;
 }
 
 static iomux_v3_cfg_t const ecspi1_pads[] = {
 	/* SS1 */
-	MX6_PAD_EIM_D19__GPIO3_IO19   | MUX_PAD_CTRL(SPI_PAD_CTRL),
+	MX6_PAD_EIM_D19__GPIO3_IO19   | MUX_PAD_CTRL(NO_PAD_CTRL),
 	MX6_PAD_EIM_D17__ECSPI1_MISO | MUX_PAD_CTRL(SPI_PAD_CTRL),
 	MX6_PAD_EIM_D18__ECSPI1_MOSI | MUX_PAD_CTRL(SPI_PAD_CTRL),
 	MX6_PAD_EIM_D16__ECSPI1_SCLK | MUX_PAD_CTRL(SPI_PAD_CTRL),
@@ -285,43 +311,11 @@ int board_phy_config(struct phy_device *phydev)
 	return 0;
 }
 
-int splash_screen_prepare(void)
-{
-	char *env_loadsplash;
-
-	if (!getenv("splashimage") || !getenv("splashsize")) {
-		return -1;
-	}
-
-	env_loadsplash = getenv("loadsplash");
-	if (env_loadsplash == NULL) {
-		printf("Environment variable loadsplash not found!\n");
-		return -1;
-	}
-
-	if (run_command_list(env_loadsplash, -1, 0)) {
-		printf("failed to run loadsplash %s\n\n", env_loadsplash);
-		return -1;
-	}
-
-	return 0;
-}
-
 static void setup_buttons(void)
 {
 	imx_iomux_v3_setup_multiple_pads(button_pads,
 					 ARRAY_SIZE(button_pads));
 }
-
-struct display_info_t {
-	int	bus;
-	int	addr;
-	int	pixfmt;
-	int	(*detect)(struct display_info_t const *dev);
-	void	(*enable)(struct display_info_t const *dev);
-	struct	fb_videomode mode;
-};
-
 
 static void do_enable_hdmi(struct display_info_t const *dev)
 {
@@ -397,7 +391,7 @@ static struct display_info_t const displays[] = {
 
 int board_cfb_skip(void)
 {
-	return NULL != getenv("novideo");
+	return 1;
 }
 
 int board_video_skip(void)
@@ -444,9 +438,6 @@ int board_video_skip(void)
 		printf("unsupported panel %s\n", panel);
 		ret = -EINVAL;
 	}
-
-	if (!ret)
-		splash_screen_prepare();
 
 	return (0 != ret);
 }

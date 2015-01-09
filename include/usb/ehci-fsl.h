@@ -11,6 +11,8 @@
 
 #include <asm/processor.h>
 
+#define CONTROL_REGISTER_W1C_MASK       0x00020000  /* W1C: PHY_CLK_VALID */
+
 /* Global offsets */
 #define FSL_SKIP_PCI		0x100
 
@@ -164,6 +166,13 @@
 #endif
 
 /*
+ * Increasing TX FIFO threshold value from 2 to 4 decreases
+ * data burst rate with which data packets are posted from the TX
+ * latency FIFO to compensate for latencies in DDR pipeline during DMA
+ */
+#define TXFIFOTHRESH		4
+
+/*
  * USB Registers
  */
 struct usb_ehci {
@@ -270,5 +279,6 @@ struct usb_ehci {
 
 /* Board-specific initialization */
 int board_ehci_hcd_init(int port);
+int board_ehci_power(int port, int on);
 
 #endif /* _EHCI_FSL_H */

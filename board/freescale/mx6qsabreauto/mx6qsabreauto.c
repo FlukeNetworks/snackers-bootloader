@@ -17,6 +17,7 @@
 #include <asm/imx-common/iomux-v3.h>
 #include <asm/imx-common/mxc_i2c.h>
 #include <asm/imx-common/boot_mode.h>
+#include <asm/imx-common/spi.h>
 #include <mmc.h>
 #include <fsl_esdhc.h>
 #include <miiphy.h>
@@ -258,6 +259,13 @@ int board_init(void)
 
 	return 0;
 }
+
+#ifdef CONFIG_MXC_SPI
+int board_spi_cs_gpio(unsigned bus, unsigned cs)
+{
+	return (bus == 0 && cs == 0) ? (IMX_GPIO_NR(4, 9)) : -1;
+}
+#endif
 
 #ifdef CONFIG_CMD_BMODE
 static const struct boot_mode board_boot_modes[] = {

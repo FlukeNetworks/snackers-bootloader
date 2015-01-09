@@ -17,6 +17,8 @@
 #include <asm/gpio.h>
 #include <asm/imx-common/iomux-v3.h>
 #include <asm/imx-common/mxc_i2c.h>
+#include <asm/imx-common/spi.h>
+#include <asm/imx-common/video.h>
 #include <asm/imx-common/boot_mode.h>
 #include <mmc.h>
 #include <fsl_esdhc.h>
@@ -29,6 +31,7 @@
 #include <i2c.h>
 #include <input.h>
 #include <netdev.h>
+#include <usb/ehci-fsl.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -252,6 +255,11 @@ int board_mmc_init(bd_t *bis)
 #endif
 
 #ifdef CONFIG_MXC_SPI
+int board_spi_cs_gpio(unsigned bus, unsigned cs)
+{
+	return (bus == 0 && cs == 0) ? (IMX_GPIO_NR(3, 19)) : -1;
+}
+
 static iomux_v3_cfg_t const ecspi1_pads[] = {
 	/* SS1 */
 	MX6_PAD_EIM_D19__GPIO3_IO19   | MUX_PAD_CTRL(SPI_PAD_CTRL),
@@ -281,16 +289,6 @@ static iomux_v3_cfg_t const backlight_pads[] = {
 	MX6_PAD_SD1_DAT1__GPIO1_IO17 | MUX_PAD_CTRL(NO_PAD_CTRL),
 #define LVDS_BACKLIGHT_EN IMX_GPIO_NR(1, 17)
 };
-
-struct display_info_t {
-	int	bus;
-	int	addr;
-	int	pixfmt;
-	int	(*detect)(struct display_info_t const *dev);
-	void	(*enable)(struct display_info_t const *dev);
-	struct	fb_videomode mode;
-};
-
 
 static void enable_lvds(void)
 {
@@ -597,4 +595,3 @@ static int do_poweroff(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[
 }
 
 U_BOOT_CMD(poweroff, 1, 1, do_poweroff, "Turn off power", "");
-

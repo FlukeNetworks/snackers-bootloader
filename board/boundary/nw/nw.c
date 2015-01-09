@@ -17,6 +17,7 @@
 #include <asm/gpio.h>
 #include <asm/imx-common/iomux-v3.h>
 #include <asm/imx-common/mxc_i2c.h>
+#include <asm/imx-common/spi.h>
 #include <asm/imx-common/boot_mode.h>
 #include <mmc.h>
 #include <fsl_esdhc.h>
@@ -28,6 +29,7 @@
 #include <input.h>
 #include <netdev.h>
 #include <splash.h>
+#include <usb/ehci-fsl.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -39,7 +41,7 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define USDHC_PAD_CTRL (PAD_CTL_PKE | PAD_CTL_PUE |	       \
 	PAD_CTL_PUS_47K_UP  | PAD_CTL_SPEED_LOW |	       \
-	PAD_CTL_DSE_80ohm   | PAD_CTL_SRE_FAST  | PAD_CTL_HYS)
+	PAD_CTL_DSE_40ohm   | PAD_CTL_SRE_FAST  | PAD_CTL_HYS)
 
 #define SPI_PAD_CTRL (PAD_CTL_HYS |				\
 	PAD_CTL_PUS_100K_DOWN | PAD_CTL_SPEED_MED |		\
@@ -154,7 +156,8 @@ static iomux_v3_cfg_t const usdhc4_pads[] = {
 	MX6_PAD_SD4_DAT5__SD4_DATA5 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
 	MX6_PAD_SD4_DAT6__SD4_DATA6 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
 	MX6_PAD_SD4_DAT7__SD4_DATA7 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
-	MX6_PAD_NANDF_D5__GPIO2_IO05    | MUX_PAD_CTRL(NO_PAD_CTRL), /* RESET */
+#define GP_EMMC_RESET	IMX_GPIO_NR(2, 5)
+	NEW_PAD_CTRL(MX6_PAD_NANDF_D5__GPIO2_IO05, WEAK_PULLUP), /* RESET */
 };
 #endif
 
@@ -238,21 +241,23 @@ int board_mmc_init(bd_t *bis)
 	printf("%s:\n", __func__ );
 #if !defined(CONFIG_REV2)
 	usdhc_cfg.sdhc_clk = mxc_get_clock(MXC_ESDHC3_CLK);
-	imx_iomux_v3_setup_multiple_pads(
-		usdhc3_pads, ARRAY_SIZE(usdhc3_pads));
 #else
+	gpio_direction_output(GP_EMMC_RESET, 1);
 	usdhc_cfg.sdhc_clk = mxc_get_clock(MXC_ESDHC4_CLK);
-	imx_iomux_v3_setup_multiple_pads(
-		usdhc4_pads, ARRAY_SIZE(usdhc4_pads));
 #endif
 	return fsl_esdhc_initialize(bis, &usdhc_cfg);
 }
 #endif
 
 #ifdef CONFIG_MXC_SPI
+int board_spi_cs_gpio(unsigned bus, unsigned cs)
+{
+	return (bus == 0 && cs == 0) ? (IMX_GPIO_NR(3, 19)) : -1;
+}
+
 static iomux_v3_cfg_t const ecspi1_pads[] = {
 	/* SS1 */
-	MX6_PAD_EIM_D19__GPIO3_IO19   | MUX_PAD_CTRL(SPI_PAD_CTRL),
+	MX6_PAD_EIM_D19__GPIO3_IO19   | MUX_PAD_CTRL(NO_PAD_CTRL),
 	MX6_PAD_EIM_D17__ECSPI1_MISO | MUX_PAD_CTRL(SPI_PAD_CTRL),
 	MX6_PAD_EIM_D18__ECSPI1_MOSI | MUX_PAD_CTRL(SPI_PAD_CTRL),
 	MX6_PAD_EIM_D16__ECSPI1_SCLK | MUX_PAD_CTRL(SPI_PAD_CTRL),
@@ -328,7 +333,8 @@ int board_video_skip(void)
 	int ret;
 	enable_hdmi();
 	ret = ipuv3_fb_init(&hdmi_mode, 0, IPU_PIX_FMT_RGB24);
-	printf("HDMI cannot be configured: %d\n", ret);
+	if (ret)
+		printf("HDMI cannot be configured: %d\n", ret);
 	return (0 != ret);
 }
 
@@ -403,7 +409,14 @@ static void setup_display(void)
 int board_early_init_f(void)
 {
 	setup_iomux_uart();
-
+#ifdef CONFIG_REV2
+	gpio_direction_output(GP_EMMC_RESET, 0);
+	imx_iomux_v3_setup_multiple_pads(
+		usdhc4_pads, ARRAY_SIZE(usdhc4_pads));
+#else
+	imx_iomux_v3_setup_multiple_pads(
+		usdhc3_pads, ARRAY_SIZE(usdhc3_pads));
+#endif
 	imx_iomux_v3_setup_multiple_pads(usb_pads, ARRAY_SIZE(usb_pads));
 
 	/* Disable WiFi/BT */
@@ -440,8 +453,7 @@ int board_eth_init(bd_t *bis)
 
 int board_init(void)
 {
-	struct iomuxc_base_regs *const iomuxc_regs
-		= (struct iomuxc_base_regs *)IOMUXC_BASE_ADDR;
+	struct iomuxc *const iomuxc_regs = (struct iomuxc *)IOMUXC_BASE_ADDR;
 
 	clrsetbits_le32(&iomuxc_regs->gpr[1],
 			IOMUXC_GPR1_OTG_ID_MASK,

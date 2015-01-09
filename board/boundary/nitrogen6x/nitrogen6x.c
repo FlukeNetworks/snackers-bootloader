@@ -18,20 +18,22 @@
 #include <asm/imx-common/iomux-v3.h>
 #include <asm/imx-common/mxc_i2c.h>
 #include <asm/imx-common/sata.h>
+#include <asm/imx-common/spi.h>
 #include <asm/imx-common/boot_mode.h>
+#include <asm/imx-common/video.h>
 #include <mmc.h>
 #include <fsl_esdhc.h>
 #include <micrel.h>
 #include <miiphy.h>
 #include <netdev.h>
-#include <linux/fb.h>
-#include <ipu_pixfmt.h>
 #include <asm/arch/crm_regs.h>
 #include <asm/arch/mxc_hdmi.h>
 #include <i2c.h>
 #include <input.h>
 #include <netdev.h>
 #include <splash.h>
+#include <usb/ehci-fsl.h>
+#include "spi_display.h"
 
 DECLARE_GLOBAL_DATA_PTR;
 #define GP_USB_OTG_PWR	IMX_GPIO_NR(3, 22)
@@ -208,7 +210,7 @@ static iomux_v3_cfg_t const misc_pads[] = {
 };
 
 /* wl1271 pads on nitrogen6x */
-iomux_v3_cfg_t const wl12xx_pads[] = {
+static iomux_v3_cfg_t const wl12xx_pads[] = {
 	(MX6_PAD_NANDF_CS1__GPIO6_IO14 & ~MUX_PAD_CTRL_MASK)
 		| MUX_PAD_CTRL(WEAK_PULLDOWN),
 	(MX6_PAD_NANDF_CS2__GPIO6_IO15 & ~MUX_PAD_CTRL_MASK)
@@ -342,9 +344,14 @@ int board_mmc_init(bd_t *bis)
 #endif
 
 #ifdef CONFIG_MXC_SPI
+int board_spi_cs_gpio(unsigned bus, unsigned cs)
+{
+	return (bus == 0 && cs == 0) ? (IMX_GPIO_NR(3, 19)) : (cs >> 8) ? (cs >> 8) : -1;
+}
+
 static iomux_v3_cfg_t const ecspi1_pads[] = {
 	/* SS1 */
-	MX6_PAD_EIM_D19__GPIO3_IO19   | MUX_PAD_CTRL(SPI_PAD_CTRL),
+	MX6_PAD_EIM_D19__GPIO3_IO19  | MUX_PAD_CTRL(NO_PAD_CTRL),
 	MX6_PAD_EIM_D17__ECSPI1_MISO | MUX_PAD_CTRL(SPI_PAD_CTRL),
 	MX6_PAD_EIM_D18__ECSPI1_MOSI | MUX_PAD_CTRL(SPI_PAD_CTRL),
 	MX6_PAD_EIM_D16__ECSPI1_SCLK | MUX_PAD_CTRL(SPI_PAD_CTRL),
@@ -482,16 +489,6 @@ static iomux_v3_cfg_t const rgb_pads[] = {
 	MX6_PAD_DISP0_DAT23__IPU1_DISP0_DATA23,
 };
 
-struct display_info_t {
-	int	bus;
-	int	addr;
-	int	pixfmt;
-	int	(*detect)(struct display_info_t const *dev);
-	void	(*enable)(struct display_info_t const *dev);
-	struct	fb_videomode mode;
-};
-
-
 static void do_enable_hdmi(struct display_info_t const *dev)
 {
 	imx_enable_hdmi_phy();
@@ -530,7 +527,32 @@ static void enable_rgb(struct display_info_t const *dev)
 	gpio_direction_output(RGB_BACKLIGHT_GP, 1);
 }
 
-static struct display_info_t const displays[] = {{
+struct display_info_t const displays[] = {
+#ifdef CONFIG_MXC_SPI_DISPLAY
+{
+	.bus	= 1,
+	.addr	= 0x70,
+	.pixfmt	= IPU_PIX_FMT_RGB24,
+	.detect	= detect_spi,
+	.enable	= enable_spi_rgb,
+	.mode	= {
+		.name           = "AUO_G050",
+		.refresh        = 60,
+		.xres           = 480,
+		.yres           = 800,
+		.pixclock       = 1000000000/516 * 1000 /836/60, /* 38636 */
+		.left_margin    = 18,
+		.right_margin   = 16,
+		.upper_margin   = 18,
+		.lower_margin   = 16,
+		.hsync_len      = 2,
+		.vsync_len      = 2,
+		.sync           = 0,
+		.vmode          = FB_VMODE_NONINTERLACED
+	},
+},
+#endif
+{
 	.bus	= 1,
 	.addr	= 0x50,
 	.pixfmt	= IPU_PIX_FMT_RGB24,
@@ -571,6 +593,26 @@ static struct display_info_t const displays[] = {{
 		.sync           = FB_SYNC_EXT,
 		.vmode          = FB_VMODE_NONINTERLACED
 } }, {
+	.bus	= 2,
+	.addr	= 0x4,
+	.pixfmt	= IPU_PIX_FMT_LVDS666,
+	.detect	= detect_i2c,
+	.enable	= enable_lvds,
+	.mode	= {
+		.name           = "Hannstar-XGA",
+		.refresh        = 60,
+		.xres           = 1024,
+		.yres           = 768,
+		.pixclock       = 15385,
+		.left_margin    = 220,
+		.right_margin   = 40,
+		.upper_margin   = 21,
+		.lower_margin   = 7,
+		.hsync_len      = 60,
+		.vsync_len      = 10,
+		.sync           = FB_SYNC_EXT,
+		.vmode          = FB_VMODE_NONINTERLACED
+} }, {
 	.bus	= 0,
 	.addr	= 0,
 	.pixfmt	= IPU_PIX_FMT_RGB24,
@@ -597,16 +639,16 @@ static struct display_info_t const displays[] = {{
 	.detect	= detect_i2c,
 	.enable	= enable_lvds,
 	.mode	= {
-		.name           = "Hannstar-XGA",
+		.name           = "LG-9.7",
 		.refresh        = 60,
 		.xres           = 1024,
 		.yres           = 768,
-		.pixclock       = 15385,
-		.left_margin    = 220,
-		.right_margin   = 40,
-		.upper_margin   = 21,
-		.lower_margin   = 7,
-		.hsync_len      = 60,
+		.pixclock       = 15385, /* ~65MHz */
+		.left_margin    = 480,
+		.right_margin   = 260,
+		.upper_margin   = 16,
+		.lower_margin   = 6,
+		.hsync_len      = 250,
 		.vsync_len      = 10,
 		.sync           = FB_SYNC_EXT,
 		.vmode          = FB_VMODE_NONINTERLACED
@@ -641,6 +683,46 @@ static struct display_info_t const displays[] = {{
 		.refresh        = 60,
 		.xres           = 1024,
 		.yres           = 600,
+		.pixclock       = 15385,
+		.left_margin    = 220,
+		.right_margin   = 40,
+		.upper_margin   = 21,
+		.lower_margin   = 7,
+		.hsync_len      = 60,
+		.vsync_len      = 10,
+		.sync           = FB_SYNC_EXT,
+		.vmode          = FB_VMODE_NONINTERLACED
+} }, {
+	.bus	= 2,
+	.addr	= 0x41,
+	.pixfmt	= IPU_PIX_FMT_LVDS666,
+	.detect	= detect_i2c,
+	.enable	= enable_lvds,
+	.mode	= {
+		.name           = "amp1024x600",
+		.refresh        = 60,
+		.xres           = 1024,
+		.yres           = 600,
+		.pixclock       = 15385,
+		.left_margin    = 220,
+		.right_margin   = 40,
+		.upper_margin   = 21,
+		.lower_margin   = 7,
+		.hsync_len      = 60,
+		.vsync_len      = 10,
+		.sync           = FB_SYNC_EXT,
+		.vmode          = FB_VMODE_NONINTERLACED
+} }, {
+	.bus	= 0,
+	.addr	= 0,
+	.pixfmt	= IPU_PIX_FMT_LVDS666,
+	.detect	= 0,
+	.enable	= enable_lvds,
+	.mode	= {
+		.name           = "wvga-lvds",
+		.refresh        = 57,
+		.xres           = 800,
+		.yres           = 480,
 		.pixclock       = 15385,
 		.left_margin    = 220,
 		.right_margin   = 40,
@@ -732,64 +814,11 @@ static struct display_info_t const displays[] = {{
 		.vmode          = FB_VMODE_NONINTERLACED
 } } };
 
+size_t display_count = ARRAY_SIZE(displays);
+
 int board_cfb_skip(void)
 {
-	return 0 != getenv("novideo");
-}
-
-int board_video_skip(void)
-{
-	int i;
-	int ret;
-	char const *panel;
-
-	imx_iomux_v3_setup_multiple_pads(
-		rgb_pads,
-		 ARRAY_SIZE(rgb_pads));
-
-	panel = getenv("panel");
-	if (!panel) {
-		for (i = 0; i < ARRAY_SIZE(displays); i++) {
-			struct display_info_t const *dev = displays+i;
-			if (dev->detect && dev->detect(dev)) {
-				panel = dev->mode.name;
-				printf("auto-detected panel %s\n", panel);
-				break;
-			}
-		}
-		if (!panel) {
-			panel = displays[0].mode.name;
-			printf("No panel detected: default to %s\n", panel);
-			i = 0;
-		}
-	} else {
-		for (i = 0; i < ARRAY_SIZE(displays); i++) {
-			if (!strcmp(panel, displays[i].mode.name))
-				break;
-		}
-	}
-	if (i < ARRAY_SIZE(displays)) {
-		ret = ipuv3_fb_init(&displays[i].mode, 0,
-				    displays[i].pixfmt);
-		if (!ret) {
-			displays[i].enable(displays+i);
-			printf("Display: %s (%ux%u)\n",
-			       displays[i].mode.name,
-			       displays[i].mode.xres,
-			       displays[i].mode.yres);
-		} else {
-			printf("LCD %s cannot be configured: %d\n",
-			       displays[i].mode.name, ret);
-		}
-	} else {
-		printf("unsupported panel %s\n", panel);
-		ret = -EINVAL;
-	}
-
-	if (!ret)
-		splash_screen_prepare();
-
-	return (0 != ret);
+	return NULL != getenv("novideo");
 }
 
 static void setup_display(void)
@@ -848,8 +877,11 @@ static void setup_display(void)
 }
 #endif
 
-/* wl1271 pads on nitrogen6x */
 static iomux_v3_cfg_t const init_pads[] = {
+	NEW_PAD_CTRL(MX6_PAD_GPIO_0__CCM_CLKO1, OUTPUT_40OHM),	/* SGTL5000 sys_mclk */
+	NEW_PAD_CTRL(MX6_PAD_GPIO_3__CCM_CLKO2, OUTPUT_40OHM),	/* J5 - Camera MCLK */
+
+	/* wl1271 pads on nitrogen6x */
 	/* WL12XX_WL_IRQ_GP */
 	NEW_PAD_CTRL(MX6_PAD_NANDF_CS1__GPIO6_IO14, WEAK_PULLDOWN),
 	/* WL12XX_WL_ENABLE_GP */
@@ -916,14 +948,14 @@ int overwrite_console(void)
 
 int board_init(void)
 {
-	struct iomuxc_base_regs *const iomuxc_regs
-		= (struct iomuxc_base_regs *)IOMUXC_BASE_ADDR;
+	struct iomuxc *const iomuxc_regs = (struct iomuxc *)IOMUXC_BASE_ADDR;
 
 	clrsetbits_le32(&iomuxc_regs->gpr[1],
 			IOMUXC_GPR1_OTG_ID_MASK,
 			IOMUXC_GPR1_OTG_ID_GPIO1);
 
 	imx_iomux_v3_setup_multiple_pads(misc_pads, ARRAY_SIZE(misc_pads));
+	imx_iomux_v3_setup_multiple_pads(wl12xx_pads, ARRAY_SIZE(wl12xx_pads));
 
 	/* address of boot parameters */
 	gd->bd->bi_boot_params = PHYS_SDRAM + 0x100;
@@ -948,6 +980,10 @@ static char const *board_type = "uninitialized";
 
 int checkboard(void)
 {
+#ifdef CONFIG_NITROGEN6X_FL
+	puts("Board: Nitrogen6X_fl\n");
+	board_type = "nitrogen6x_fl";
+#else
 	if (gpio_get_value(WL12XX_WL_IRQ_GP)) {
 		puts("Board: Nitrogen6X\n");
 		board_type = "nitrogen6x";
@@ -956,6 +992,7 @@ int checkboard(void)
 		puts("Board: SABRE Lite\n");
 		board_type = "sabrelite";
 	}
+#endif
 	return 0;
 }
 

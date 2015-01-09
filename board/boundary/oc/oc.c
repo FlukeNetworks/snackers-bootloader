@@ -18,6 +18,8 @@
 #include <asm/imx-common/iomux-v3.h>
 #include <asm/imx-common/mxc_i2c.h>
 #include <asm/imx-common/sata.h>
+#include <asm/imx-common/spi.h>
+#include <asm/imx-common/video.h>
 #include <asm/imx-common/boot_mode.h>
 #include <mmc.h>
 #include <fsl_esdhc.h>
@@ -31,6 +33,7 @@
 #include <i2c.h>
 #include <input.h>
 #include <netdev.h>
+#include <usb/ehci-fsl.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -322,15 +325,15 @@ int board_mmc_init(bd_t *bis)
 }
 #endif
 
-u32 get_board_rev(void)
+#ifdef CONFIG_MXC_SPI
+int board_spi_cs_gpio(unsigned bus, unsigned cs)
 {
-	return 0x63000;
+	return (bus == 0 && cs == 0) ? (IMX_GPIO_NR(3, 19)) : -1;
 }
 
-#ifdef CONFIG_MXC_SPI
 static iomux_v3_cfg_t const ecspi1_pads[] = {
 	/* SS1 */
-	MX6_PAD_EIM_D19__GPIO3_IO19   | MUX_PAD_CTRL(SPI_PAD_CTRL),
+	MX6_PAD_EIM_D19__GPIO3_IO19   | MUX_PAD_CTRL(NO_PAD_CTRL),
 	MX6_PAD_EIM_D17__ECSPI1_MISO | MUX_PAD_CTRL(SPI_PAD_CTRL),
 	MX6_PAD_EIM_D18__ECSPI1_MOSI | MUX_PAD_CTRL(SPI_PAD_CTRL),
 	MX6_PAD_EIM_D16__ECSPI1_SCLK | MUX_PAD_CTRL(SPI_PAD_CTRL),
@@ -407,15 +410,6 @@ static iomux_v3_cfg_t const backlight_pads[] = {
 #define LVDS_BACKLIGHT_EN IMX_GPIO_NR(1, 17)
 };
 
-struct display_info_t {
-	int	bus;
-	int	addr;
-	int	pixfmt;
-	void	(*enable)(struct display_info_t const *dev);
-	struct	fb_videomode mode;
-};
-
-
 static void enable_hdmi(struct display_info_t const *dev)
 {
 	struct hdmi_regs *hdmi	= (struct hdmi_regs *)HDMI_ARB_BASE_ADDR;
@@ -440,6 +434,18 @@ static void enable_lvds(struct display_info_t const *dev)
 				IOMUXC_BASE_ADDR;
 	u32 reg = readl(&iomux->gpr[2]);
 	reg |= IOMUXC_GPR2_DATA_WIDTH_CH0_24BIT;
+	writel(reg, &iomux->gpr[2]);
+	gpio_direction_output(LVDS_BACKLIGHT_PWM, 1);
+	gpio_direction_output(LVDS_BACKLIGHT_EN, 1);
+}
+
+static void enable_lvds_jeida(struct display_info_t const *dev)
+{
+	struct iomuxc *iomux = (struct iomuxc *)
+				IOMUXC_BASE_ADDR;
+	u32 reg = readl(&iomux->gpr[2]);
+	reg |= IOMUXC_GPR2_DATA_WIDTH_CH0_24BIT
+	     |IOMUXC_GPR2_BIT_MAPPING_CH0_JEIDA;
 	writel(reg, &iomux->gpr[2]);
 	gpio_direction_output(LVDS_BACKLIGHT_PWM, 1);
 	gpio_direction_output(LVDS_BACKLIGHT_EN, 1);
@@ -512,6 +518,28 @@ static struct display_info_t const vga = {
 	}
 };
 
+static struct display_info_t const wxga = {
+	.bus	= 2,
+	.addr	= 0x38,
+	.pixfmt	= IPU_PIX_FMT_RGB24,
+	.enable	= enable_lvds_jeida,
+	.mode	= {
+		.name           = "LDB-WXGA",
+		.refresh        = 60,
+		.xres           = 1280,
+		.yres           = 800,
+		.pixclock       = 14065,
+		.left_margin    = 40,
+		.right_margin   = 40,
+		.upper_margin   = 3,
+		.lower_margin   = 80,
+		.hsync_len      = 10,
+		.vsync_len      = 10,
+		.sync           = FB_SYNC_EXT,
+		.vmode          = FB_VMODE_NONINTERLACED
+	}
+};
+
 int board_video_skip(void)
 {
 	int ret;
@@ -523,6 +551,8 @@ int board_video_skip(void)
 		display = &hdmi;
 	else if (0 == strcmp(panel, "XGA"))
 		display = &xga;
+	else if (0 == strcmp(panel, "LDB-WXGA"))
+		display = &wxga;
 	else if (0 != strcmp(panel, "off"))
 		display = &vga;
 
@@ -649,12 +679,11 @@ static iomux_v3_cfg_t const i2c0_mux_pads[] = {
 
 int board_init(void)
 {
-       struct iomuxc_base_regs *const iomuxc_regs
-               = (struct iomuxc_base_regs *)IOMUXC_BASE_ADDR;
+	struct iomuxc *const iomuxc_regs = (struct iomuxc *)IOMUXC_BASE_ADDR;
 
-       clrsetbits_le32(&iomuxc_regs->gpr[1],
-                       IOMUXC_GPR1_OTG_ID_MASK,
-                       IOMUXC_GPR1_OTG_ID_GPIO1);
+	clrsetbits_le32(&iomuxc_regs->gpr[1],
+			IOMUXC_GPR1_OTG_ID_MASK,
+			IOMUXC_GPR1_OTG_ID_GPIO1);
 
 	/* address of boot parameters */
 	gd->bd->bi_boot_params = PHYS_SDRAM + 0x100;

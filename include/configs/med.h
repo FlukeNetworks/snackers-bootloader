@@ -27,6 +27,8 @@
 #define CONFIG_INITRD_TAG
 #define CONFIG_REVISION_TAG
 
+#define CONFIG_SYS_GENERIC_BOARD
+
 /* Size of malloc() pool */
 #define CONFIG_SYS_MALLOC_LEN		(12 * 1024 * 1024)
 
@@ -56,7 +58,7 @@
 #define CONFIG_MXC_SPI
 #define CONFIG_MXC_SPI_DISPLAY
 #define CONFIG_SF_DEFAULT_BUS  0
-#define CONFIG_SF_DEFAULT_CS   (0|(IMX_GPIO_NR(3, 19)<<8))
+#define CONFIG_SF_DEFAULT_CS   0
 #define CONFIG_SF_DEFAULT_SPEED 25000000
 #define CONFIG_SF_DEFAULT_MODE (SPI_MODE_0)
 #endif
@@ -67,16 +69,6 @@
 #define CONFIG_SYS_I2C_MXC
 #define CONFIG_SYS_I2C_SPEED		100000
 #define CONFIG_I2C_EDID
-
-/* OCOTP Configs */
-#define CONFIG_CMD_IMXOTP
-#ifdef CONFIG_CMD_IMXOTP
-#define CONFIG_IMX_OTP
-#define IMX_OTP_BASE			OCOTP_BASE_ADDR
-#define IMX_OTP_ADDR_MAX		0x7F
-#define IMX_OTP_DATA_ERROR_VAL		0xBADABADA
-#define IMX_OTPWRITE_ENABLED
-#endif
 
 /* MMC Configs */
 #define CONFIG_FSL_ESDHC
@@ -91,6 +83,7 @@
 #define CONFIG_CMD_EXT2
 #define CONFIG_CMD_FAT
 #define CONFIG_DOS_PARTITION
+#define CONFIG_EFI_PARTITION
 
 #define CONFIG_CMD_PING
 #define CONFIG_CMD_DHCP
@@ -137,7 +130,7 @@
 #define CONFIG_SPLASH_SCREEN
 #define CONFIG_SPLASH_SCREEN_ALIGN
 
- #define CONFIG_VIDEO_BMP_GZIP
+#define CONFIG_VIDEO_BMP_GZIP
 #ifdef CONFIG_VIDEO_BMP_GZIP
 #define CONFIG_SYS_VIDEO_LOGO_MAX_SIZE (6 * 1024 * 1024)
 #endif
@@ -160,9 +153,13 @@
 
 #define CONFIG_BOOTDELAY	       1
 
-#define CONFIG_PREBOOT                 ""
+#define CONFIG_PREBOOT                 "if itest.s  \"\" != \"$splashsize\" ; then " \
+					" sf probe" \
+					" && sf read $splashram $splashflash $splashsize" \
+					" && bmp d $splashram ;" \
+				       "fi"
 
-#define CONFIG_LOADADDR			       0x12000000
+#define CONFIG_LOADADDR			0x12000000
 #define CONFIG_SYS_TEXT_BASE	       0x17800000
 
 #ifdef CONFIG_CMD_MMC
@@ -201,13 +198,26 @@
 			"done ; " \
 		"done; " \
 		"setenv stdout serial,vga ; " \
+		"ums 0 mmc 1 ;" \
 		"echo ; echo 6x_bootscript not found ; " \
 		"echo ; echo serial console at 115200, 8N1 ; echo ; " \
 		"echo details at http://boundarydevices.com/6q_bootscript ; " \
 		"setenv stdin serial,usbkbd\0" \
 	"fdt_addr=0x11000000\0" \
 	"fdt_high=0xffffffff\0" \
-	"loadsplash=if sf probe ; then sf read ${splashimage} c2000 ${splashsize} ; fi\0" \
+	"initrd_high=0xffffffff\0" \
+	"loadsplash=if sf probe ; then sf read ${splashram} ${splashflash} ${splashsize} ; fi\0" \
+	"splashram=0x10008000\0" \
+	"splashflash=0xf0000\0" \
+	"splashpos=m,m\0" \
+	"savesplash=for dtype in mmc ; do " \
+			"for disk in 0 1 2; do " \
+				"${dtype} dev ${disk} ;" \
+				"load ${dtype} ${disk}:1 12800000 /savesplash " \
+				"&& source 12800000 ;" \
+			"done ;" \
+		"done\0" \
+	"novideo=1\0" \
 	"upgradeu=for dtype in ${bootdevs}" \
 		"; do " \
 		"for disk in 0 1 ; do ${dtype} dev ${disk} ;" \
@@ -220,6 +230,11 @@
 	"done\0" \
 	"usbnet_devaddr=00:19:b8:00:00:02\0" \
 	"usbnet_hostaddr=00:19:b8:00:00:01\0" \
+	"netrecover=setenv ethact FEC; " \
+		"setenv bootargs console=ttymxc1,115200; " \
+		"dhcp 10800000 $serverip:uImage-${board}-recovery" \
+		"&& dhcp 12800000 $serverip:uramdisk-${board}-recovery.img " \
+		"&& bootm 10800000 12800000\0" \
 	"usbrecover=setenv ethact usb_ether; " \
 		"setenv ipaddr 10.0.0.2; " \
 		"setenv netmask 255.255.255.0; " \
@@ -294,5 +309,16 @@
 #define CONFIG_BOARD_LATE_INIT
 
 #define CONFIG_CMD_ELF
+
+#define CONFIG_USB_GADGET
+#define CONFIG_CMD_USB_MASS_STORAGE
+#define CONFIG_USB_GADGET_MASS_STORAGE
+#define CONFIG_USBDOWNLOAD_GADGET
+#define CONFIG_USB_GADGET_VBUS_DRAW	2
+
+/* Netchip IDs */
+#define CONFIG_G_DNL_VENDOR_NUM 0x0525
+#define CONFIG_G_DNL_PRODUCT_NUM 0xa4a5
+#define CONFIG_G_DNL_MANUFACTURER "Boundary"
 
 #endif	       /* __CONFIG_H */

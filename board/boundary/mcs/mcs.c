@@ -17,6 +17,8 @@
 #include <asm/gpio.h>
 #include <asm/imx-common/iomux-v3.h>
 #include <asm/imx-common/mxc_i2c.h>
+#include <asm/imx-common/spi.h>
+#include <asm/imx-common/video.h>
 #include <asm/imx-common/boot_mode.h>
 #include <mmc.h>
 #include <fsl_esdhc.h>
@@ -31,6 +33,7 @@
 #include <i2c.h>
 #include <input.h>
 #include <netdev.h>
+#include <usb/ehci-fsl.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -42,7 +45,7 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define USDHC_PAD_CTRL (PAD_CTL_PKE | PAD_CTL_PUE |	       \
 	PAD_CTL_PUS_47K_UP  | PAD_CTL_SPEED_LOW |	       \
-	PAD_CTL_DSE_80ohm   | PAD_CTL_SRE_FAST  | PAD_CTL_HYS)
+	PAD_CTL_DSE_40ohm   | PAD_CTL_SRE_FAST  | PAD_CTL_HYS)
 
 #define ENET_PAD_CTRL  (PAD_CTL_PKE | PAD_CTL_PUE |		\
 	PAD_CTL_PUS_100K_UP | PAD_CTL_SPEED_MED	  |		\
@@ -258,7 +261,7 @@ static struct fsl_esdhc_cfg usdhc_cfg[3] = {
 	{USDHC2_BASE_ADDR},
 	{
 		.esdhc_base = USDHC4_BASE_ADDR,
-                .max_bus_width = 8 
+                .max_bus_width = 8
 	}
 };
 
@@ -327,9 +330,14 @@ int board_mmc_init(bd_t *bis)
 	return status;
 }
 
+int board_spi_cs_gpio(unsigned bus, unsigned cs)
+{
+	return (bus == 0 && cs == 0) ? (IMX_GPIO_NR(3, 19)) : -1;
+}
+
 static iomux_v3_cfg_t const ecspi1_pads[] = {
 	/* SS1 */
-	MX6_PAD_EIM_D19__GPIO3_IO19  | MUX_PAD_CTRL(SPI_PAD_CTRL),
+	MX6_PAD_EIM_D19__GPIO3_IO19  | MUX_PAD_CTRL(NO_PAD_CTRL),
 	MX6_PAD_EIM_D17__ECSPI1_MISO | MUX_PAD_CTRL(SPI_PAD_CTRL),
 	MX6_PAD_EIM_D18__ECSPI1_MOSI | MUX_PAD_CTRL(SPI_PAD_CTRL),
 	MX6_PAD_EIM_D16__ECSPI1_SCLK | MUX_PAD_CTRL(SPI_PAD_CTRL),
@@ -405,6 +413,10 @@ static iomux_v3_cfg_t const gpio_pads[] = {
 	MX6_PAD_EIM_A23__GPIO6_IO06 | MUX_PAD_CTRL(WEAK_PULLUP),
 	/* EIM_A24 - J54 pin 2 */
 	MX6_PAD_EIM_A24__GPIO5_IO04 | MUX_PAD_CTRL(WEAK_PULLUP),
+	/* EIM_A25 - J5 4-wire/5-wire select */
+	MX6_PAD_EIM_A25__GPIO5_IO02 | MUX_PAD_CTRL(WEAK_PULLDOWN),
+	/* SD3_DAT4 - jumpered 4-wire/5-wire select on first rev (4-wire was low) */
+	MX6_PAD_SD3_DAT4__GPIO7_IO01 | MUX_PAD_CTRL(WEAK_PULLDOWN),
 };
 
 static iomux_v3_cfg_t const backlight_pads[] = {
@@ -435,21 +447,13 @@ int splash_screen_prepare(void)
 	return 0;
 }
 
-struct display_info_t {
-	int	bus;
-	int	addr;
-	int	pixfmt;
-	void	(*enable)(struct display_info_t const *dev);
-	struct	fb_videomode mode;
-};
-
-
 static void enable_lvds(struct display_info_t const *dev)
 {
 	struct iomuxc *iomux = (struct iomuxc *)
 				IOMUXC_BASE_ADDR;
 	u32 reg = readl(&iomux->gpr[2]);
-	reg |= IOMUXC_GPR2_DATA_WIDTH_CH0_24BIT;
+	reg |= IOMUXC_GPR2_DATA_WIDTH_CH0_24BIT
+	     |IOMUXC_GPR2_BIT_MAPPING_CH0_JEIDA;
 	writel(reg, &iomux->gpr[2]);
 	gpio_direction_output(LVDS_BACKLIGHT_PWM, 1);
 }
@@ -475,6 +479,11 @@ static struct display_info_t const display = {
 		.vmode          = FB_VMODE_NONINTERLACED
 	}
 };
+
+int board_cfb_skip(void)
+{
+	return 1;
+}
 
 int board_video_skip(void)
 {
@@ -565,6 +574,11 @@ static void setup_display(void)
 	imx_iomux_v3_setup_multiple_pads(gpio_pads,
 					 ARRAY_SIZE(gpio_pads));
 	gpio_direction_input(LVDS_BACKLIGHT_PWM);
+
+	/* EIM_A25 - J5 4-wire/5-wire select (4-wire is 0) */
+	gpio_direction_input(IMX_GPIO_NR(5, 2));
+	/* SD3_DAT4 - jumpered 4-wire/5-wire select on first rev */
+	gpio_direction_input(IMX_GPIO_NR(7, 1));
 }
 
 int board_early_init_f(void)

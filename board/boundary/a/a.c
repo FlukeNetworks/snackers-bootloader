@@ -17,6 +17,7 @@
 #include <asm/gpio.h>
 #include <asm/imx-common/iomux-v3.h>
 #include <asm/imx-common/boot_mode.h>
+#include <asm/imx-common/spi.h>
 #include <mmc.h>
 #include <fsl_esdhc.h>
 #include <micrel.h>
@@ -25,6 +26,7 @@
 #include <linux/fb.h>
 #include <asm/arch/crm_regs.h>
 #include <input.h>
+#include <usb/ehci-fsl.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -86,9 +88,14 @@ static iomux_v3_cfg_t const usdhc4_pads[] = {
 };
 
 static iomux_v3_cfg_t const usb_pads[] = {
-	NEW_PAD_CTRL(MX6_PAD_EIM_D22__GPIO3_IO22, WEAK_PULLUP),	/* usbotg power */
-	NEW_PAD_CTRL(MX6_PAD_GPIO_1__USB_OTG_ID, USDHC_PAD_CTRL), /* USBOTG ID pin */
-	MX6_PAD_KEY_COL4__USB_OTG_OC,			/* USBOTG OC pin */
+	NEW_PAD_CTRL(MX6_PAD_EIM_D22__GPIO3_IO22, WEAK_PULLUP),		/* usbotg power */
+	NEW_PAD_CTRL(MX6_PAD_GPIO_1__USB_OTG_ID, USDHC_PAD_CTRL), 	/* USBOTG ID pin */
+	MX6_PAD_KEY_COL4__USB_OTG_OC,					/* USBOTG OC pin */
+	NEW_PAD_CTRL(MX6_PAD_NANDF_D5__GPIO2_IO05, OUTPUT_40OHM),   	/* Modem OFF */
+	NEW_PAD_CTRL(MX6_PAD_NANDF_D6__GPIO2_IO06, WEAK_PULLUP), 	/* Modem nRESET */
+	MX6_PAD_NANDF_D7__GPIO2_IO07   | MUX_PAD_CTRL(NO_PAD_CTRL), 	/* Modem Sleep stat */
+	NEW_PAD_CTRL(MX6_PAD_NANDF_WP_B__GPIO6_IO09, OUTPUT_40OHM),
+	MX6_PAD_NANDF_RB0__GPIO6_IO10  | MUX_PAD_CTRL(NO_PAD_CTRL), 	/* Modem Wakeup In */
 };
 
 static void setup_iomux_uart(void)
@@ -136,9 +143,14 @@ int board_mmc_init(bd_t *bis)
 #endif
 
 #ifdef CONFIG_MXC_SPI
+int board_spi_cs_gpio(unsigned bus, unsigned cs)
+{
+	return (bus == 0 && cs == 0) ? (IMX_GPIO_NR(3, 19)) : -1;
+}
+
 static iomux_v3_cfg_t const ecspi1_pads[] = {
 	/* SS1 */
-	MX6_PAD_EIM_D19__GPIO3_IO19   | MUX_PAD_CTRL(SPI_PAD_CTRL),
+	MX6_PAD_EIM_D19__GPIO3_IO19  | MUX_PAD_CTRL(NO_PAD_CTRL),
 	MX6_PAD_EIM_D17__ECSPI1_MISO | MUX_PAD_CTRL(SPI_PAD_CTRL),
 	MX6_PAD_EIM_D18__ECSPI1_MOSI | MUX_PAD_CTRL(SPI_PAD_CTRL),
 	MX6_PAD_EIM_D16__ECSPI1_SCLK | MUX_PAD_CTRL(SPI_PAD_CTRL),
@@ -158,6 +170,8 @@ int board_early_init_f(void)
 
 	gpio_direction_output(IMX_GPIO_NR(3, 22), 0);	/* disable USB otg power */
 	imx_iomux_v3_setup_multiple_pads(usb_pads, ARRAY_SIZE(usb_pads));
+	gpio_direction_output(IMX_GPIO_NR(2,5), 0); /* de-assert MODEM off */
+	gpio_direction_output(IMX_GPIO_NR(2,6), 1); /* de-assert MODEM nRESET */
 	return 0;
 }
 
@@ -309,8 +323,7 @@ int board_eth_init(bd_t *bis)
 int board_init(void)
 {
 	int i;
-	struct iomuxc_base_regs *const iomuxc_regs
-		= (struct iomuxc_base_regs *)IOMUXC_BASE_ADDR;
+	struct iomuxc *const iomuxc_regs = (struct iomuxc *)IOMUXC_BASE_ADDR;
 
 	clrsetbits_le32(&iomuxc_regs->gpr[1],
 			IOMUXC_GPR1_OTG_ID_MASK,
@@ -362,7 +375,7 @@ static int read_keys(char *buf)
 {
 	int i, numpressed = 0;
 	for (i = 0; i < ARRAY_SIZE(buttons); i++) {
-		if (buttons[i].presslevel 
+		if (buttons[i].presslevel
 		    == gpio_get_value(buttons[i].gpnum))
 			buf[numpressed++] = buttons[i].ident;
 	}

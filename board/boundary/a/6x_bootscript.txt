@@ -6,7 +6,7 @@ fi
 kernel=/boot/uImage
 ramdisk=/boot/uramdisk.img
 
-if kbd ; then 
+if kbd ; then
     if itest.s "xF" == "x$keybd" ; then
         kernel=/boot/uImage-usbwrite
         ramdisk=/boot/uramdisk-usbwrite

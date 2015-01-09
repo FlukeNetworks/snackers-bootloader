@@ -18,6 +18,8 @@
 #include <asm/imx-common/iomux-v3.h>
 #include <asm/imx-common/mxc_i2c.h>
 #include <asm/imx-common/sata.h>
+#include <asm/imx-common/spi.h>
+#include <asm/imx-common/video.h>
 #include <asm/imx-common/boot_mode.h>
 #include <mmc.h>
 #include <fsl_esdhc.h>
@@ -30,6 +32,7 @@
 #include <i2c.h>
 #include <input.h>
 #include <netdev.h>
+#include <usb/ehci-fsl.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -300,6 +303,11 @@ int board_mmc_init(bd_t *bis)
 #endif
 
 #ifdef CONFIG_MXC_SPI
+int board_spi_cs_gpio(unsigned bus, unsigned cs)
+{
+	return (bus == 0 && cs == 0) ? (IMX_GPIO_NR(3, 19)) : -1;
+}
+
 static iomux_v3_cfg_t const ecspi1_pads[] = {
 	/* SS1 */
 	NEW_PAD_CTRL(MX6_PAD_EIM_D19__GPIO3_IO19, SPI_PAD_CTRL),
@@ -420,14 +428,6 @@ static iomux_v3_cfg_t const rgb_pads[] = {
 	MX6_PAD_DISP0_DAT23__IPU1_DISP0_DATA23,
 };
 
-struct display_info_t {
-	int	bus;
-	int	addr;
-	int	pixfmt;
-	void	(*enable)(struct display_info_t const *dev);
-	struct	fb_videomode mode;
-};
-
 static void enable_rgb(struct display_info_t const *dev)
 {
 	imx_iomux_v3_setup_multiple_pads(rgb_pads, ARRAY_SIZE(rgb_pads));
@@ -512,7 +512,7 @@ int board_video_skip(void)
 {
 	int ret;
 	char const *panel = getenv("panel");
-	struct display_info_t const *display = 0;
+	struct display_info_t const *display = NULL;
 	if (!panel || !strcmp(panel, "1024x600"))
 		display = &d_1024x600;
 	else if (0 == strcmp(panel, "INNOLUX-WVGA"))

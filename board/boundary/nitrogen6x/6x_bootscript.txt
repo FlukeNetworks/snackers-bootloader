@@ -50,6 +50,22 @@ else
 	echo "------ no ft5x06 touch controller";
 fi
 
+if i2c probe 0x41 ; then
+        setenv bootargs $bootargs video=mxcfb${nextcon}:dev=ldb,1024x600M@60,if=RGB666
+	if test "0" -eq $nextcon; then
+		setenv fbmem "fbmem=10M";
+	else
+		setenv fbmem ${fbmem},10M
+	fi
+	setexpr nextcon $nextcon + 1
+	setenv bootargs $bootargs ft5x06_ts.screenres=$screenres
+	if itest.s "x" -ne "x$calibration" ; then
+		setenv bootargs $bootargs ft5x06_ts.calibration=$calibration
+	fi
+else
+	echo "------ no ILI210x touch controller";
+fi
+
 if i2c probe 0x48 ; then
 	if itest.s "xqvga" == "x$panel" ; then
 		display="320x240MR@60,if=RGB24";
@@ -84,8 +100,12 @@ if test "sata" = "${dtype}" ; then
 else
         if test "usb" = "${dtype}" ; then
                 setenv bootargs "$bootargs root=/dev/sda$bootpart" ;
-        else
+        elif itest.s "x" == "x$sdphys" ; then
                 setenv bootargs "$bootargs root=/dev/mmcblk0p$bootpart" ;
+        elif itest 0 -eq ${disk}; then
+                setenv bootargs "$bootargs root=/dev/mmcblk2p$bootpart" ;
+        else
+                setenv bootargs "$bootargs root=/dev/mmcblk3p$bootpart" ;
         fi
 fi
 
@@ -121,6 +141,14 @@ if itest.s x == x$allow_noncea ; then
 else
         setenv bootargs $bootargs mxc_hdmi.only_cea=0;
         echo "non-CEA modes allowed on HDMI, audio may be affected";
+fi
+
+if itest.s "x" != "x$disable_giga" ; then
+        setenv bootargs $bootargs fec.disable_giga=1
+fi
+
+if itest.s "x" != "x$wlmac" ; then
+        setenv bootargs $bootargs wlcore.mac=$wlmac
 fi
 
 if ${fs}load ${dtype} ${disk}:1 10800000 ${bootdir}uImage ; then
