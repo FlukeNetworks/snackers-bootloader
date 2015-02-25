@@ -1,3 +1,6 @@
+#if 1
+#define SNACKERS_BOARD
+#endif
 /*
  * Copyright (C) 2010-2011 Freescale Semiconductor, Inc.
  *
@@ -51,12 +54,30 @@
 #define CONFIG_CMD_SF
 #ifdef CONFIG_CMD_SF
 #define CONFIG_SPI_FLASH
+
+#ifdef SNACKERS_BOARD
+#define CONFIG_SPI_FLASH_MICRON
+#else
 #define CONFIG_SPI_FLASH_SST
+#endif /* SNACKERS_BOARD */
+
 #define CONFIG_MXC_SPI
+
+#ifdef SNACKERS_BOARD
+
+#define CONFIG_SF_DEFAULT_BUS  3
+#define CONFIG_SF_DEFAULT_CS   2
+#define CONFIG_SF_DEFAULT_SPEED 25000000
+#define CONFIG_SF_DEFAULT_MODE (SPI_MODE_0)
+
+#else
+
 #define CONFIG_SF_DEFAULT_BUS  0
 #define CONFIG_SF_DEFAULT_CS   0
 #define CONFIG_SF_DEFAULT_SPEED 25000000
 #define CONFIG_SF_DEFAULT_MODE (SPI_MODE_0)
+
+#endif /* SNACKERS_BOARD */
 #endif
 
 /* I2C Configs */
@@ -388,7 +409,11 @@
 #define CONFIG_SYS_MMC_ENV_DEV		0
 #elif defined(CONFIG_ENV_IS_IN_SPI_FLASH)
 #define CONFIG_ENV_OFFSET		(768 * 1024)
+#ifdef SNACKERS_BOARD
+#define CONFIG_ENV_SECT_SIZE		(64 * 1024)
+#else
 #define CONFIG_ENV_SECT_SIZE		(8 * 1024)
+#endif
 #define CONFIG_ENV_SPI_BUS		CONFIG_SF_DEFAULT_BUS
 #define CONFIG_ENV_SPI_CS		CONFIG_SF_DEFAULT_CS
 #define CONFIG_ENV_SPI_MODE		CONFIG_SF_DEFAULT_MODE

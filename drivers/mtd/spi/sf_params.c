@@ -13,6 +13,11 @@
 
 /* SPI/QSPI flash device params structure */
 const struct spi_flash_params spi_flash_params_table[] = {
+#ifdef SNACKERS_BOARD
+#ifdef CONFIG_SPI_FLASH_MICRON		/* MICRON */
+	{"M25P16",	       0x202015 ,  0x1000,	64 * 1024,    32,	0,	    0 },
+#endif
+#endif
 #ifdef CONFIG_SPI_FLASH_ATMEL		/* ATMEL */
 	{"AT45DB011D",	   0x1f2200, 0x0,	64 * 1024,     4,	0,		    SECT_4K},
 	{"AT45DB021D",	   0x1f2300, 0x0,	64 * 1024,     8,	0,		    SECT_4K},

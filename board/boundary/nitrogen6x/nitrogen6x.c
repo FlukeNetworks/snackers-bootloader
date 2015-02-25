@@ -36,7 +36,11 @@
 #include "spi_display.h"
 
 DECLARE_GLOBAL_DATA_PTR;
+#ifdef SNACKERS_BOARD
+#define GP_USB_OTG_PWR	IMX_GPIO_NR(4, 15)
+#else
 #define GP_USB_OTG_PWR	IMX_GPIO_NR(3, 22)
+#endif /* SNACKERS_BOARD */
 
 #define UART_PAD_CTRL  (PAD_CTL_PUS_100K_UP |			\
 	PAD_CTL_SPEED_MED | PAD_CTL_DSE_40ohm |			\
@@ -69,12 +73,40 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define OUTPUT_40OHM (PAD_CTL_SPEED_MED|PAD_CTL_DSE_40ohm)
 
+#ifdef SNACKERS_BOARD
+/* LKD GPIO definitions */
+#define PHY_RESET_GP     IMX_GPIO_NR(1, 25)
+#define SYS_RESET_B_GP   IMX_GPIO_NR(3, 19)
+#define SPI_FLASH_CS_GP  IMX_GPIO_NR(3, 24)
+#define USB_OTG_POWER_GP IMX_GPIO_NR(4, 15)
+#define USB_HUB_RESET_GP IMX_GPIO_NR(5, 28)
+#define BT_POWER_GP      IMX_GPIO_NR(7, 5)
+#endif /* SNACKERS_BOARD */
+
 int dram_init(void)
 {
 	gd->ram_size = ((ulong)CONFIG_DDR_MB * 1024 * 1024);
 
 	return 0;
 }
+
+#ifdef SNACKERS_BOARD
+/***************************************************************************************/
+static iomux_v3_cfg_t const uart2_pads[] = {
+	MX6_PAD_GPIO_7__UART2_TX_DATA | MUX_PAD_CTRL(UART_PAD_CTRL),
+	MX6_PAD_GPIO_8__UART2_RX_DATA | MUX_PAD_CTRL(UART_PAD_CTRL),
+};
+
+#if 0
+static iomux_v3_cfg_t const uart3_pads[] = {
+	MX6_PAD_EIM_D25__UART3_RX_DATA | MUX_PAD_CTRL(UART_PAD_CTRL),
+	MX6_PAD_EIM_D24__UART3_TX_DATA | MUX_PAD_CTRL(UART_PAD_CTRL),
+};
+#endif
+/***************************************************************************************/
+
+#else
+
 
 static iomux_v3_cfg_t const uart1_pads[] = {
 	MX6_PAD_SD3_DAT6__UART1_RX_DATA | MUX_PAD_CTRL(UART_PAD_CTRL),
@@ -92,7 +124,60 @@ static iomux_v3_cfg_t const uart2_pads[] = {
 #endif
 };
 
+
+#endif /* SNACKERS_BOARD */
+/***************************************************************************************/
+
+
 #define PC MUX_PAD_CTRL(I2C_PAD_CTRL)
+
+#ifdef SNACKERS_BOARD
+/***************************************************************************************/
+
+/* I2C1: PMIC */
+static struct i2c_pads_info i2c_pad_info0 = {
+	.scl = {
+		.i2c_mode = MX6_PAD_CSI0_DAT9__I2C1_SCL | PC,
+		.gpio_mode = MX6_PAD_CSI0_DAT9__GPIO5_IO27 | PC,
+		.gp = IMX_GPIO_NR(5, 27)
+	},
+	.sda = {
+		.i2c_mode = MX6_PAD_CSI0_DAT8__I2C1_SDA | PC,
+		.gpio_mode = MX6_PAD_CSI0_DAT8__GPIO5_IO26 | PC,
+		.gp = IMX_GPIO_NR(5, 26)
+	}
+};
+
+/* I2C2: MFI, USB Hub */
+static struct i2c_pads_info i2c_pad_info1 = {
+	.scl = {
+		.i2c_mode = MX6_PAD_KEY_COL3__I2C2_SCL | PC,
+		.gpio_mode = MX6_PAD_KEY_COL3__GPIO4_IO12 | PC,
+		.gp = IMX_GPIO_NR(4, 12)
+	},
+	.sda = {
+		.i2c_mode = MX6_PAD_KEY_ROW3__I2C2_SDA | PC,
+		.gpio_mode = MX6_PAD_KEY_ROW3__GPIO4_IO13 | PC,
+		.gp = IMX_GPIO_NR(4, 13)
+	}
+};
+
+/* I2C3: Battery Charger, Touch Panel */
+static struct i2c_pads_info i2c_pad_info2 = {
+	.scl = {
+		.i2c_mode = MX6_PAD_EIM_D17__I2C3_SCL | PC,
+		.gpio_mode = MX6_PAD_EIM_D17__GPIO3_IO17 | PC,
+		.gp = IMX_GPIO_NR(3, 17)
+	},
+	.sda = {
+		.i2c_mode = MX6_PAD_EIM_D18__I2C3_SDA | PC,
+		.gpio_mode = MX6_PAD_EIM_D18__GPIO3_IO18 | PC,
+		.gp = IMX_GPIO_NR(3, 18)
+	}
+};
+/***************************************************************************************/
+
+#else
 
 /* I2C1, SGTL5000 */
 static struct i2c_pads_info i2c_pad_info0 = {
@@ -136,6 +221,29 @@ static struct i2c_pads_info i2c_pad_info2 = {
 	}
 };
 
+#endif /* SNACKERS_BOARD */
+/***************************************************************************************/
+
+
+#ifdef SNACKERS_BOARD
+/***************************************************************************************/
+
+static iomux_v3_cfg_t const usdhc4_pads[] = {
+	MX6_PAD_SD4_CLK__SD4_CLK   | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_CMD__SD4_CMD   | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_DAT0__SD4_DATA0 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_DAT1__SD4_DATA1 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_DAT2__SD4_DATA2 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_DAT3__SD4_DATA3 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_DAT4__SD4_DATA4 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_DAT5__SD4_DATA5 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_DAT6__SD4_DATA6 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD4_DAT7__SD4_DATA7 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+};
+/***************************************************************************************/
+
+#else
+
 static iomux_v3_cfg_t const usdhc2_pads[] = {
 	MX6_PAD_SD2_CLK__SD2_CLK   | MUX_PAD_CTRL(USDHC_PAD_CTRL),
 	MX6_PAD_SD2_CMD__SD2_CMD   | MUX_PAD_CTRL(USDHC_PAD_CTRL),
@@ -165,6 +273,10 @@ static iomux_v3_cfg_t const usdhc4_pads[] = {
 	MX6_PAD_NANDF_D6__GPIO2_IO06    | MUX_PAD_CTRL(NO_PAD_CTRL), /* CD */
 };
 
+#endif /* SNACKERS_BOARD */
+/***************************************************************************************/
+
+
 static iomux_v3_cfg_t const enet_pads1[] = {
 	MX6_PAD_ENET_MDIO__ENET_MDIO		| MUX_PAD_CTRL(ENET_PAD_CTRL),
 	MX6_PAD_ENET_MDC__ENET_MDC		| MUX_PAD_CTRL(ENET_PAD_CTRL),
@@ -188,8 +300,12 @@ static iomux_v3_cfg_t const enet_pads1[] = {
 	/* pin 33 - 1 - (CLK125_EN) 125Mhz clockout enabled */
 	MX6_PAD_RGMII_RX_CTL__GPIO6_IO24	| MUX_PAD_CTRL(NO_PAD_CTRL),
 	/* pin 42 PHY nRST */
+#ifdef SNACKERS_BOARD
+	MX6_PAD_ENET_CRS_DV__GPIO1_IO25		| MUX_PAD_CTRL(NO_PAD_CTRL),
+#else
 	MX6_PAD_EIM_D23__GPIO3_IO23		| MUX_PAD_CTRL(NO_PAD_CTRL),
 	MX6_PAD_ENET_RXD0__GPIO1_IO27		| MUX_PAD_CTRL(NO_PAD_CTRL),
+#endif /* SNACKERS_BOARD */
 };
 
 static iomux_v3_cfg_t const enet_pads2[] = {
@@ -202,11 +318,19 @@ static iomux_v3_cfg_t const enet_pads2[] = {
 };
 
 static iomux_v3_cfg_t const misc_pads[] = {
+#ifdef SNACKERS_BOARD
+	MX6_PAD_GPIO_1__USB_OTG_ID		| MUX_PAD_CTRL(WEAK_PULLUP),
+	MX6_PAD_KEY_COL4__USB_OTG_OC		| MUX_PAD_CTRL(WEAK_PULLUP),
+	/* OTG Power enable */
+	MX6_PAD_KEY_ROW4__GPIO4_IO15		| MUX_PAD_CTRL(OUTPUT_40OHM),
+
+#else
 	MX6_PAD_GPIO_1__USB_OTG_ID		| MUX_PAD_CTRL(WEAK_PULLUP),
 	MX6_PAD_KEY_COL4__USB_OTG_OC		| MUX_PAD_CTRL(WEAK_PULLUP),
 	MX6_PAD_EIM_D30__USB_H1_OC		| MUX_PAD_CTRL(WEAK_PULLUP),
 	/* OTG Power enable */
 	MX6_PAD_EIM_D22__GPIO3_IO22		| MUX_PAD_CTRL(OUTPUT_40OHM),
+#endif /* SNACKERS_BOARD */
 };
 
 /* wl1271 pads on nitrogen6x */
@@ -240,6 +364,28 @@ static iomux_v3_cfg_t const button_pads[] = {
 
 static void setup_iomux_enet(void)
 {
+#ifdef SNACKERS_BOARD
+/***************************************************************************************/
+
+	gpio_direction_output(IMX_GPIO_NR(1, 25), 0); /* Assert PHY rst */
+	gpio_direction_output(IMX_GPIO_NR(1, 27), 0); /* Nitrogen6X PHY rst */
+	gpio_direction_output(IMX_GPIO_NR(6, 30), 1);
+	gpio_direction_output(IMX_GPIO_NR(6, 25), 1);
+	gpio_direction_output(IMX_GPIO_NR(6, 27), 1);
+	gpio_direction_output(IMX_GPIO_NR(6, 28), 1);
+	gpio_direction_output(IMX_GPIO_NR(6, 29), 1);
+	imx_iomux_v3_setup_multiple_pads(enet_pads1, ARRAY_SIZE(enet_pads1));
+    gpio_direction_output(IMX_GPIO_NR(6, 24), 1);
+
+	/* Need delay 10ms according to KSZ9021 spec */
+	udelay(1000 * 10);
+	gpio_set_value(IMX_GPIO_NR(1, 25), 1); /* Deassert PHY reset */
+
+	imx_iomux_v3_setup_multiple_pads(enet_pads2, ARRAY_SIZE(enet_pads2));
+	udelay(100);	/* Wait 100 us before using mii interface */
+/***************************************************************************************/
+
+#else
 	gpio_direction_output(IMX_GPIO_NR(3, 23), 0); /* SABRE Lite PHY rst */
 	gpio_direction_output(IMX_GPIO_NR(1, 27), 0); /* Nitrogen6X PHY rst */
 	gpio_direction_output(IMX_GPIO_NR(6, 30), 1);
@@ -257,28 +403,44 @@ static void setup_iomux_enet(void)
 
 	imx_iomux_v3_setup_multiple_pads(enet_pads2, ARRAY_SIZE(enet_pads2));
 	udelay(100);	/* Wait 100 us before using mii interface */
+#endif /* SNACKERS_BOARD */
+/***************************************************************************************/
+
 }
 
 static iomux_v3_cfg_t const usb_pads[] = {
+#ifdef SNACKERS_BOARD
+	MX6_PAD_CSI0_DAT10__GPIO5_IO28 | MUX_PAD_CTRL(NO_PAD_CTRL),
+#else
 	MX6_PAD_GPIO_17__GPIO7_IO12 | MUX_PAD_CTRL(NO_PAD_CTRL),
+#endif /* SNACKERS_BOARD */
 };
 
 static void setup_iomux_uart(void)
 {
+#ifdef SNACKERS_BOARD
+	imx_iomux_v3_setup_multiple_pads(uart2_pads, ARRAY_SIZE(uart2_pads));
+#else
 	imx_iomux_v3_setup_multiple_pads(uart1_pads, ARRAY_SIZE(uart1_pads));
 	imx_iomux_v3_setup_multiple_pads(uart2_pads, ARRAY_SIZE(uart2_pads));
+#endif
 }
 
 #ifdef CONFIG_USB_EHCI_MX6
 int board_ehci_hcd_init(int port)
 {
 	imx_iomux_v3_setup_multiple_pads(usb_pads, ARRAY_SIZE(usb_pads));
-
+#ifdef SNACKERS_BOARD
+	/* Reset USB hub */
+	gpio_direction_output(IMX_GPIO_NR(5, 28), 0);
+	mdelay(2);
+	gpio_set_value(IMX_GPIO_NR(5, 28), 1);
+#else
 	/* Reset USB hub */
 	gpio_direction_output(IMX_GPIO_NR(7, 12), 0);
 	mdelay(2);
 	gpio_set_value(IMX_GPIO_NR(7, 12), 1);
-
+#endif /* SNACKERS_BOARD */
 	return 0;
 }
 
@@ -300,17 +462,51 @@ static struct fsl_esdhc_cfg usdhc_cfg[2] = {
 
 int board_mmc_getcd(struct mmc *mmc)
 {
+#ifdef SNACKERS_BOARD
+/***************************************************************************************/
+
+    // LKD: Always return 1 for eMMC card detect
+
+	struct fsl_esdhc_cfg *cfg = (struct fsl_esdhc_cfg *)mmc->priv;
+	if (cfg->esdhc_base == USDHC4_BASE_ADDR)
+    {
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
+/***************************************************************************************/
+
+#else
 	struct fsl_esdhc_cfg *cfg = (struct fsl_esdhc_cfg *)mmc->priv;
 	int gp_cd = (cfg->esdhc_base == USDHC3_BASE_ADDR) ? IMX_GPIO_NR(7, 0) :
 			IMX_GPIO_NR(2, 6);
 
 	gpio_direction_input(gp_cd);
 	return !gpio_get_value(gp_cd);
+#endif /* SNACKERS_BOARD */
+/***************************************************************************************/
+
 }
 
 int board_mmc_init(bd_t *bis)
 {
 	s32 status = 0;
+
+#ifdef SNACKERS_BOARD
+/***************************************************************************************/
+
+	usdhc_cfg[1].sdhc_clk      = mxc_get_clock(MXC_ESDHC4_CLK);
+	usdhc_cfg[1].max_bus_width = 8;
+
+   imx_iomux_v3_setup_multiple_pads(
+       usdhc4_pads, ARRAY_SIZE(usdhc4_pads));
+
+   status |= fsl_esdhc_initialize(bis, &usdhc_cfg[1]);
+/***************************************************************************************/
+
+#else
 	u32 index = 0;
 
 	usdhc_cfg[0].sdhc_clk = mxc_get_clock(MXC_ESDHC3_CLK);
@@ -338,6 +534,8 @@ int board_mmc_init(bd_t *bis)
 
 		status |= fsl_esdhc_initialize(bis, &usdhc_cfg[index]);
 	}
+#endif /* SNACKERS_BOARD */
+/***************************************************************************************/
 
 	return status;
 }
@@ -346,8 +544,24 @@ int board_mmc_init(bd_t *bis)
 #ifdef CONFIG_MXC_SPI
 int board_spi_cs_gpio(unsigned bus, unsigned cs)
 {
+#ifdef SNACKERS_BOARD
+    return (bus == 3 && cs == 2) ? (IMX_GPIO_NR(3, 24)) : (cs >> 8) ? (cs >> 8) : -1;
+#else
 	return (bus == 0 && cs == 0) ? (IMX_GPIO_NR(3, 19)) : (cs >> 8) ? (cs >> 8) : -1;
+#endif /* SNACKERS_BOARD */
 }
+
+#ifdef SNACKERS_BOARD
+/***************************************************************************************/
+static iomux_v3_cfg_t const ecspi4_pads[] = {
+	/* SS2 */
+	MX6_PAD_EIM_D24__GPIO3_IO24  | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_EIM_D22__ECSPI4_MISO | MUX_PAD_CTRL(SPI_PAD_CTRL),
+	MX6_PAD_EIM_D28__ECSPI4_MOSI | MUX_PAD_CTRL(SPI_PAD_CTRL),
+	MX6_PAD_EIM_D21__ECSPI4_SCLK | MUX_PAD_CTRL(SPI_PAD_CTRL),
+};
+/***************************************************************************************/
+#else
 
 static iomux_v3_cfg_t const ecspi1_pads[] = {
 	/* SS1 */
@@ -356,11 +570,18 @@ static iomux_v3_cfg_t const ecspi1_pads[] = {
 	MX6_PAD_EIM_D18__ECSPI1_MOSI | MUX_PAD_CTRL(SPI_PAD_CTRL),
 	MX6_PAD_EIM_D16__ECSPI1_SCLK | MUX_PAD_CTRL(SPI_PAD_CTRL),
 };
+#endif /* SNACKERS_BOARD */
+/***************************************************************************************/
 
 static void setup_spi(void)
 {
+#ifdef SNACKERS_BOARD
+	imx_iomux_v3_setup_multiple_pads(ecspi4_pads,
+					 ARRAY_SIZE(ecspi4_pads));
+#else
 	imx_iomux_v3_setup_multiple_pads(ecspi1_pads,
 					 ARRAY_SIZE(ecspi1_pads));
+#endif /* SNACKERS_BOARD */
 }
 #endif
 
@@ -450,7 +671,11 @@ static void setup_buttons(void)
 static iomux_v3_cfg_t const backlight_pads[] = {
 	/* Backlight on RGB connector: J15 */
 	MX6_PAD_SD1_DAT3__GPIO1_IO21 | MUX_PAD_CTRL(NO_PAD_CTRL),
+#ifdef SNACKERS_BOARD
+#define RGB_BACKLIGHT_GP IMX_GPIO_NR(1, 11)
+#else
 #define RGB_BACKLIGHT_GP IMX_GPIO_NR(1, 21)
+#endif
 
 	/* Backlight on LVDS connector: J6 */
 	MX6_PAD_SD1_CMD__GPIO1_IO18 | MUX_PAD_CTRL(NO_PAD_CTRL),
@@ -877,6 +1102,18 @@ static void setup_display(void)
 }
 #endif
 
+#ifdef SNACKERS_BOARD
+/***************************************************************************************/
+static iomux_v3_cfg_t const init_pads[] = {
+	/* SYS_RESET_B */
+	NEW_PAD_CTRL(MX6_PAD_EIM_D19__GPIO3_IO19, OUTPUT_40OHM),
+	/* BT_POWER */
+	NEW_PAD_CTRL(MX6_PAD_SD3_DAT1__GPIO7_IO05, OUTPUT_40OHM),
+	/* USB otg power */
+	NEW_PAD_CTRL(MX6_PAD_KEY_ROW4__GPIO4_IO15, OUTPUT_40OHM),
+};
+/***************************************************************************************/
+#else
 static iomux_v3_cfg_t const init_pads[] = {
 	NEW_PAD_CTRL(MX6_PAD_GPIO_0__CCM_CLKO1, OUTPUT_40OHM),	/* SGTL5000 sys_mclk */
 	NEW_PAD_CTRL(MX6_PAD_GPIO_3__CCM_CLKO2, OUTPUT_40OHM),	/* J5 - Camera MCLK */
@@ -895,9 +1132,24 @@ static iomux_v3_cfg_t const init_pads[] = {
 	NEW_PAD_CTRL(MX6_PAD_GPIO_8__GPIO1_IO08, OUTPUT_40OHM),
 	NEW_PAD_CTRL(MX6_PAD_GPIO_6__GPIO1_IO06, OUTPUT_40OHM),
 };
+#endif /* SNACKERS_BOARD */
+/***************************************************************************************/
 
 #define WL12XX_WL_IRQ_GP	IMX_GPIO_NR(6, 14)
 
+#ifdef SNACKERS_BOARD
+/***************************************************************************************/
+static unsigned gpios_out_low[] = {
+	USB_OTG_POWER_GP,	/* disable USB otg power */
+    BT_POWER_GP, 	    /* disable bluetooth */
+	PHY_RESET_GP,       /* Reset Phy */
+};
+
+static unsigned gpios_out_high[] = {
+	SYS_RESET_B_GP,	/* deassert SYS_RESET_B */
+};
+/***************************************************************************************/
+#else
 static unsigned gpios_out_low[] = {
 	/* Disable wl1271 */
 	IMX_GPIO_NR(6, 15),	/* disable wireless */
@@ -911,6 +1163,8 @@ static unsigned gpios_out_high[] = {
 	IMX_GPIO_NR(1, 6),	/* ov5642 powerdown */
 	IMX_GPIO_NR(6, 9),	/* ov5640 mipi camera power down */
 };
+#endif /* SNACKERS_BOARD */
+/***************************************************************************************/
 
 static void set_gpios(unsigned *p, int cnt, int val)
 {
@@ -926,10 +1180,23 @@ int board_early_init_f(void)
 
 	set_gpios(gpios_out_high, ARRAY_SIZE(gpios_out_high), 1);
 	set_gpios(gpios_out_low, ARRAY_SIZE(gpios_out_low), 0);
+#ifndef SNACKERS_BOARD
 	gpio_direction_input(WL12XX_WL_IRQ_GP);
+#endif
 
+#if 0
+#ifdef SNACKERS_BOARD
+    /* Make sure all SPI bus 1 signals are inputs for now.  TODO: remove later. */
+	gpio_direction_input(IMX_GPIO_NR(4,6));
+	gpio_direction_input(IMX_GPIO_NR(4,7));
+	gpio_direction_input(IMX_GPIO_NR(4,8));
+	gpio_direction_input(IMX_GPIO_NR(4,9));
+#endif
+#endif
 	imx_iomux_v3_setup_multiple_pads(init_pads, ARRAY_SIZE(init_pads));
+#ifndef SNACKERS_BOARD
 	setup_buttons();
+#endif
 
 #if defined(CONFIG_VIDEO_IPUV3)
 	setup_display();
@@ -955,7 +1222,9 @@ int board_init(void)
 			IOMUXC_GPR1_OTG_ID_GPIO1);
 
 	imx_iomux_v3_setup_multiple_pads(misc_pads, ARRAY_SIZE(misc_pads));
+#ifndef SNACKERS_BOARD
 	imx_iomux_v3_setup_multiple_pads(wl12xx_pads, ARRAY_SIZE(wl12xx_pads));
+#endif
 
 	/* address of boot parameters */
 	gd->bd->bi_boot_params = PHYS_SDRAM + 0x100;
@@ -963,8 +1232,10 @@ int board_init(void)
 #ifdef CONFIG_MXC_SPI
 	setup_spi();
 #endif
+#ifndef SNACKERS_BOARD
 	imx_iomux_v3_setup_multiple_pads(
 		usdhc2_pads, ARRAY_SIZE(usdhc2_pads));
+#endif /* SNACKERS_BOARD */
 	setup_i2c(0, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info0);
 	setup_i2c(1, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info1);
 	setup_i2c(2, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info2);
@@ -981,7 +1252,11 @@ static char const *board_type = "uninitialized";
 int checkboard(void)
 {
 #ifdef CONFIG_NITROGEN6X_FL
+#ifdef SNACKERS_BOARD
+	puts("Board: Snackers\n");
+#else
 	puts("Board: Nitrogen6X_fl\n");
+#endif
 	board_type = "nitrogen6x_fl";
 #else
 	if (gpio_get_value(WL12XX_WL_IRQ_GP)) {
@@ -1123,3 +1398,4 @@ int board_late_init(void)
 
 	return 0;
 }
+
