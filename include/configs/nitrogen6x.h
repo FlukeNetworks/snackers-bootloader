@@ -80,6 +80,17 @@
 #endif /* SNACKERS_BOARD */
 #endif
 
+#ifdef SNACKERS_BOARD
+
+/* For the EEPROM.  See eeprom.m95xxx.c */
+#define CONFIG_CMD_EEPROM
+#define CONFIG_SPI
+#define CONFIG_DEFAULT_SPI_BUS  1
+#define CONFIG_DEFAULT_SPI_MODE (SPI_MODE_0)
+#define CONFIG_SYS_EEPROM_SIZE  32768
+#define CONFIG_SPI_M95XXX
+#endif
+
 /* I2C Configs */
 #define CONFIG_CMD_I2C
 #define CONFIG_SYS_I2C
@@ -129,7 +140,11 @@
 #define IMX_FEC_BASE			ENET_BASE_ADDR
 #define CONFIG_FEC_XCV_TYPE		RGMII
 #define CONFIG_ETHPRIME			"FEC"
+#ifdef SNACKERS_BOARD
+#define CONFIG_FEC_MXC_PHYADDR		0
+#else
 #define CONFIG_FEC_MXC_PHYADDR		6
+#endif
 #define CONFIG_PHYLIB
 #define CONFIG_PHY_MICREL
 #define CONFIG_PHY_MICREL_KSZ9021

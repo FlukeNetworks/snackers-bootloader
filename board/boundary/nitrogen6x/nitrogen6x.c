@@ -75,8 +75,11 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #ifdef SNACKERS_BOARD
 /* LKD GPIO definitions */
+#define BACKLIGHT_EN_GP  IMX_GPIO_NR(1, 11)
 #define PHY_RESET_GP     IMX_GPIO_NR(1, 25)
+#define POE_ENABLE_GP    IMX_GPIO_NR(6,  1)
 #define SYS_RESET_B_GP   IMX_GPIO_NR(3, 19)
+#define SPI_EEPROM_CS_GP IMX_GPIO_NR(2, 26)
 #define SPI_FLASH_CS_GP  IMX_GPIO_NR(3, 24)
 #define USB_OTG_POWER_GP IMX_GPIO_NR(4, 15)
 #define USB_HUB_RESET_GP IMX_GPIO_NR(5, 28)
@@ -324,6 +327,9 @@ static iomux_v3_cfg_t const misc_pads[] = {
 	/* OTG Power enable */
 	MX6_PAD_KEY_ROW4__GPIO4_IO15		| MUX_PAD_CTRL(OUTPUT_40OHM),
 
+    /* POE Enable*/
+	MX6_PAD_CSI0_DAT15__GPIO6_IO01		| MUX_PAD_CTRL(OUTPUT_40OHM),
+
 #else
 	MX6_PAD_GPIO_1__USB_OTG_ID		| MUX_PAD_CTRL(WEAK_PULLUP),
 	MX6_PAD_KEY_COL4__USB_OTG_OC		| MUX_PAD_CTRL(WEAK_PULLUP),
@@ -368,14 +374,7 @@ static void setup_iomux_enet(void)
 /***************************************************************************************/
 
 	gpio_direction_output(IMX_GPIO_NR(1, 25), 0); /* Assert PHY rst */
-	gpio_direction_output(IMX_GPIO_NR(1, 27), 0); /* Nitrogen6X PHY rst */
-	gpio_direction_output(IMX_GPIO_NR(6, 30), 1);
-	gpio_direction_output(IMX_GPIO_NR(6, 25), 1);
-	gpio_direction_output(IMX_GPIO_NR(6, 27), 1);
-	gpio_direction_output(IMX_GPIO_NR(6, 28), 1);
-	gpio_direction_output(IMX_GPIO_NR(6, 29), 1);
 	imx_iomux_v3_setup_multiple_pads(enet_pads1, ARRAY_SIZE(enet_pads1));
-    gpio_direction_output(IMX_GPIO_NR(6, 24), 1);
 
 	/* Need delay 10ms according to KSZ9021 spec */
 	udelay(1000 * 10);
@@ -411,6 +410,11 @@ static void setup_iomux_enet(void)
 static iomux_v3_cfg_t const usb_pads[] = {
 #ifdef SNACKERS_BOARD
 	MX6_PAD_CSI0_DAT10__GPIO5_IO28 | MUX_PAD_CTRL(NO_PAD_CTRL),
+
+    /* USB Hub CFG_SEL0 AND CFG_SEL1 */
+	MX6_PAD_KEY_COL3__GPIO4_IO12		| MUX_PAD_CTRL(OUTPUT_40OHM),
+	MX6_PAD_CSI0_DAT11__GPIO5_IO29		| MUX_PAD_CTRL(OUTPUT_40OHM),
+
 #else
 	MX6_PAD_GPIO_17__GPIO7_IO12 | MUX_PAD_CTRL(NO_PAD_CTRL),
 #endif /* SNACKERS_BOARD */
@@ -431,6 +435,10 @@ int board_ehci_hcd_init(int port)
 {
 	imx_iomux_v3_setup_multiple_pads(usb_pads, ARRAY_SIZE(usb_pads));
 #ifdef SNACKERS_BOARD
+    /* Select USB Hub default config:  CFG_SEL0 = 0, CFG_SEL1=0 */
+    gpio_direction_output(IMX_GPIO_NR(4, 12), 0);
+    gpio_direction_output(IMX_GPIO_NR(5, 29), 0);
+
 	/* Reset USB hub */
 	gpio_direction_output(IMX_GPIO_NR(5, 28), 0);
 	mdelay(2);
@@ -545,7 +553,18 @@ int board_mmc_init(bd_t *bis)
 int board_spi_cs_gpio(unsigned bus, unsigned cs)
 {
 #ifdef SNACKERS_BOARD
-    return (bus == 3 && cs == 2) ? (IMX_GPIO_NR(3, 24)) : (cs >> 8) ? (cs >> 8) : -1;
+    if (bus == 3 && cs == 2)
+    {
+        return SPI_FLASH_CS_GP;
+    }
+    else if (bus == 1 && cs == 0)
+    {
+        return SPI_EEPROM_CS_GP;
+    }
+    else
+    {
+        return ((cs >> 8) ? (cs >> 8) : -1);
+    }
 #else
 	return (bus == 0 && cs == 0) ? (IMX_GPIO_NR(3, 19)) : (cs >> 8) ? (cs >> 8) : -1;
 #endif /* SNACKERS_BOARD */
@@ -553,8 +572,17 @@ int board_spi_cs_gpio(unsigned bus, unsigned cs)
 
 #ifdef SNACKERS_BOARD
 /***************************************************************************************/
+
+static iomux_v3_cfg_t const ecspi2_pads[] = {
+	/* SS0: EEPROM */
+	MX6_PAD_EIM_RW__GPIO2_IO26   | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_EIM_OE__ECSPI2_MISO  | MUX_PAD_CTRL(SPI_PAD_CTRL),
+	MX6_PAD_EIM_CS1__ECSPI2_MOSI | MUX_PAD_CTRL(SPI_PAD_CTRL),
+	MX6_PAD_EIM_CS0__ECSPI2_SCLK | MUX_PAD_CTRL(SPI_PAD_CTRL),
+};
+
 static iomux_v3_cfg_t const ecspi4_pads[] = {
-	/* SS2 */
+	/* SS2: NOR Flash */
 	MX6_PAD_EIM_D24__GPIO3_IO24  | MUX_PAD_CTRL(NO_PAD_CTRL),
 	MX6_PAD_EIM_D22__ECSPI4_MISO | MUX_PAD_CTRL(SPI_PAD_CTRL),
 	MX6_PAD_EIM_D28__ECSPI4_MOSI | MUX_PAD_CTRL(SPI_PAD_CTRL),
@@ -576,8 +604,8 @@ static iomux_v3_cfg_t const ecspi1_pads[] = {
 static void setup_spi(void)
 {
 #ifdef SNACKERS_BOARD
-	imx_iomux_v3_setup_multiple_pads(ecspi4_pads,
-					 ARRAY_SIZE(ecspi4_pads));
+	imx_iomux_v3_setup_multiple_pads(ecspi2_pads, ARRAY_SIZE(ecspi2_pads));
+	imx_iomux_v3_setup_multiple_pads(ecspi4_pads, ARRAY_SIZE(ecspi4_pads));
 #else
 	imx_iomux_v3_setup_multiple_pads(ecspi1_pads,
 					 ARRAY_SIZE(ecspi1_pads));
@@ -587,6 +615,33 @@ static void setup_spi(void)
 
 int board_phy_config(struct phy_device *phydev)
 {
+#ifdef SNACKERS_BOARD
+
+#define DEVADDR 2
+
+    /* LKD:  Have to configure the skew or ethernet will not work.
+     *  
+     * Paul S. calculated a 2ns required clock skew so that the data transmissions start 
+     * in the middle of the 125MHz clock rising and falling edges. This calculation      
+     * assumes that the clock and data traces on the board are of equal length.          
+     *                                                                                   
+     * But, the skew config does not allow for this much skew.  Therefore, we achieve    
+     * the maximum skew between the clock and data signals by putting the signals at     
+     * opposite ends of the skew range: 0 for data and 0x3ff for clocks. See the KSZ9031 
+     * data sheet.                                                                       
+     */
+
+    /* RX_CTL/TX_CTL output pad skew */
+	ksz9031_phy_extended_write(phydev, DEVADDR, MII_KSZ9031_EXT_RGMII_CTRL_SIG_SKEW, MII_KSZ9031_MOD_DATA_POST_INC_RW, 0x0);
+
+    /* RXDn pad skew */
+	ksz9031_phy_extended_write(phydev, DEVADDR, MII_KSZ9031_EXT_RGMII_RX_DATA_SKEW, MII_KSZ9031_MOD_DATA_POST_INC_RW, 0x0);
+    /* TXDn pad skew */
+	ksz9031_phy_extended_write(phydev, DEVADDR, MII_KSZ9031_EXT_RGMII_TX_DATA_SKEW, MII_KSZ9031_MOD_DATA_POST_INC_RW, 0x0);
+
+    /* TXC/RXC pad skew */
+	ksz9031_phy_extended_write(phydev, DEVADDR, MII_KSZ9031_EXT_RGMII_CLOCK_SKEW, MII_KSZ9031_MOD_DATA_POST_INC_RW, 0x03ff);
+#else    
 	/* min rx data delay */
 	ksz9021_phy_extended_write(phydev,
 			MII_KSZ9021_EXT_RGMII_RX_DATA_SKEW, 0x0);
@@ -596,6 +651,7 @@ int board_phy_config(struct phy_device *phydev)
 	/* max rx/tx clock delay, min rx/tx control */
 	ksz9021_phy_extended_write(phydev,
 			MII_KSZ9021_EXT_RGMII_CLOCK_SKEW, 0xf0f0);
+#endif
 	if (phydev->drv->config)
 		phydev->drv->config(phydev);
 
@@ -615,8 +671,15 @@ int board_eth_init(bd_t *bis)
 	bus = fec_get_miibus(base, -1);
 	if (!bus)
 		return 0;
+#ifdef SNACKERS_BOARD
+	/* scan phy 0-3 */
+    udelay(1000*100);
+	phydev = phy_find_by_mask(bus, (0xf), PHY_INTERFACE_MODE_RGMII);
+
+#else
 	/* scan phy 4,5,6,7 */
 	phydev = phy_find_by_mask(bus, (0xf << 4), PHY_INTERFACE_MODE_RGMII);
+#endif
 	if (!phydev) {
 		free(bus);
 		return 0;
@@ -755,7 +818,12 @@ static void enable_rgb(struct display_info_t const *dev)
 struct display_info_t const displays[] = {
 #ifdef CONFIG_MXC_SPI_DISPLAY
 {
+#ifdef  SNACKERS_BOARD
+    /* Use ECSPI5 (bus number = 4) */
+	.bus	= 4,
+#else
 	.bus	= 1,
+#endif
 	.addr	= 0x70,
 	.pixfmt	= IPU_PIX_FMT_RGB24,
 	.detect	= detect_spi,
@@ -1111,6 +1179,8 @@ static iomux_v3_cfg_t const init_pads[] = {
 	NEW_PAD_CTRL(MX6_PAD_SD3_DAT1__GPIO7_IO05, OUTPUT_40OHM),
 	/* USB otg power */
 	NEW_PAD_CTRL(MX6_PAD_KEY_ROW4__GPIO4_IO15, OUTPUT_40OHM),
+    /* USB Hub Pin 28 (SUSP_IND/LOCAL_PWR) */
+	NEW_PAD_CTRL(MX6_PAD_CSI0_DAT12__GPIO5_IO30, OUTPUT_40OHM),
 };
 /***************************************************************************************/
 #else
@@ -1143,9 +1213,11 @@ static unsigned gpios_out_low[] = {
 	USB_OTG_POWER_GP,	/* disable USB otg power */
     BT_POWER_GP, 	    /* disable bluetooth */
 	PHY_RESET_GP,       /* Reset Phy */
+    POE_ENABLE_GP,      /* Deassert POE_ENABLE*/
 };
 
 static unsigned gpios_out_high[] = {
+    BACKLIGHT_EN_GP, /* Assert BACKLIGHT_ENABLE */
 	SYS_RESET_B_GP,	/* deassert SYS_RESET_B */
 };
 /***************************************************************************************/
@@ -1157,6 +1229,7 @@ static unsigned gpios_out_low[] = {
 	IMX_GPIO_NR(3, 22),	/* disable USB otg power */
 	IMX_GPIO_NR(2, 5),	/* ov5640 mipi camera reset */
 	IMX_GPIO_NR(1, 8),	/* ov5642 reset */
+	IMX_GPIO_NR(5, 30),	/* USB Hub SUSP_IND/LOCAL_PWR */
 };
 
 static unsigned gpios_out_high[] = {

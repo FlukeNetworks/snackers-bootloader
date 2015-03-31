@@ -91,7 +91,9 @@ typedef volatile unsigned char	vu_char;
 #endif
 
 /* LKD */
+#if 1
 #define SNACKERS_BOARD
+#endif
 
 #ifdef DEBUG
 #define _DEBUG	1

@@ -35,12 +35,12 @@ static iomux_v3_cfg_t const spi_display_pads[] = {
 	IOMUX_PAD_CTRL(SD1_CLK__ECSPI5_SCLK, SPI_PAD_CTRL),
 	IOMUX_PAD_CTRL(SD1_CMD__ECSPI5_MOSI, SPI_PAD_CTRL),
 	IOMUX_PAD_CTRL(SD1_DAT0__ECSPI5_MISO, SPI_PAD_CTRL),
-#define GP_ECSPI2_CS		IMX_GPIO_NR(1, 19)
+#define GP_ECSPI5_CS		IMX_GPIO_NR(1, 19)
 	IOMUX_PAD_CTRL(SD1_DAT2__GPIO1_IO19, SPI_PAD_CTRL),
 #define GP_SPI_DISPLAY_RESET	IMX_GPIO_NR(1, 15)
 	IOMUX_PAD_CTRL(SD2_DAT0__GPIO1_IO15, SPI_PAD_CTRL),
-#define GP_BACKLIGHT		IMX_GPIO_NR(1, 21)		/* PWM1 */
-	IOMUX_PAD_CTRL(SD1_DAT3__GPIO1_IO21, SPI_PAD_CTRL),
+#define GP_BACKLIGHT		IMX_GPIO_NR(1, 11)		/* PWM1 */
+	IOMUX_PAD_CTRL(SD2_CMD__GPIO1_IO11, SPI_PAD_CTRL),
 
 #else    
 	/* ECSPI2 */
@@ -189,7 +189,12 @@ static u8 display_on_cmds[] = {
 
 void enable_spi_rgb(struct display_info_t const *dev)
 {
+#ifdef SNACKERS_BOARD
+	unsigned cs_gpio = GP_ECSPI5_CS;
+#else
 	unsigned cs_gpio = GP_ECSPI2_CS;
+#endif
+
 	struct spi_slave *spi;
 	int ret;
 
@@ -248,7 +253,12 @@ free_bus:
  */
 int detect_spi(struct display_info_t const *dev)
 {
+#ifdef SNACKERS_BOARD
+	unsigned cs_gpio = GP_ECSPI5_CS;
+#else
 	unsigned cs_gpio = GP_ECSPI2_CS;
+#endif
+
 	unsigned reset_gpio = GP_SPI_DISPLAY_RESET;
 
 	debug("%s\n", __func__);
@@ -264,11 +274,19 @@ int detect_spi(struct display_info_t const *dev)
 
 static int do_spid(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
+#ifdef SNACKERS_BOARD
+	unsigned cs_gpio = GP_ECSPI5_CS;
+#else
 	unsigned cs_gpio = GP_ECSPI2_CS;
+#endif
 	struct spi_slave *spi;
 	int ret = 0;
 	int arg = 2;
+#ifdef SNACKERS_BOARD
+	int bus = 4;
+#else
 	int bus = 1;
+#endif
 	uint reg;
 	u8 buf[80];
 
