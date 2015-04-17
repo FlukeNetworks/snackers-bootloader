@@ -723,11 +723,13 @@ int splash_screen_prepare(void)
 	return 0;
 }
 
+#ifndef SNACKERS_BOARD
 static void setup_buttons(void)
 {
 	imx_iomux_v3_setup_multiple_pads(button_pads,
 					 ARRAY_SIZE(button_pads));
 }
+#endif
 
 #if defined(CONFIG_VIDEO_IPUV3)
 
@@ -1464,7 +1466,11 @@ int board_late_init(void)
                                "rootwait root=/dev/ram rw "
                                "g_ether.host_addr=00:c0:17:00:00:01 "
                                "g_ether.dev_addr=00:c0:17:00:00:02 usbotgboot");
-	    setenv("bootcmd", "bootm 0x10800000 0x10d00000");
+#ifdef SNACKERS_BOARD
+	    setenv("bootcmd", "source 0x10cc0000; bootm 0x10800000 0x10d00000");
+#else
+        setenv("bootcmd", "bootm 0x10800000 0x10d00000");
+#endif
 	}
 	else
 	    setenv("usbotgboot", "no");
