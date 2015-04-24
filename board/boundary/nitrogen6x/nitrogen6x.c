@@ -151,7 +151,7 @@ static struct i2c_pads_info i2c_pad_info0 = {
 	}
 };
 
-/* I2C2: MFI, USB Hub */
+/* I2C2: MFI */
 static struct i2c_pads_info i2c_pad_info1 = {
 	.scl = {
 		.i2c_mode = MX6_PAD_KEY_COL3__I2C2_SCL | PC,
@@ -165,7 +165,7 @@ static struct i2c_pads_info i2c_pad_info1 = {
 	}
 };
 
-/* I2C3: Battery Charger, Touch Panel */
+/* I2C3: Battery, Touch Panel, USB Hub */
 static struct i2c_pads_info i2c_pad_info2 = {
 	.scl = {
 		.i2c_mode = MX6_PAD_EIM_D17__I2C3_SCL | PC,
@@ -412,7 +412,7 @@ static iomux_v3_cfg_t const usb_pads[] = {
 	MX6_PAD_CSI0_DAT10__GPIO5_IO28 | MUX_PAD_CTRL(NO_PAD_CTRL),
 
     /* USB Hub CFG_SEL0 AND CFG_SEL1 */
-	MX6_PAD_KEY_COL3__GPIO4_IO12		| MUX_PAD_CTRL(OUTPUT_40OHM),
+	MX6_PAD_EIM_D17__GPIO3_IO17		| MUX_PAD_CTRL(OUTPUT_40OHM),
 	MX6_PAD_CSI0_DAT11__GPIO5_IO29		| MUX_PAD_CTRL(OUTPUT_40OHM),
 
 #else
@@ -436,7 +436,7 @@ int board_ehci_hcd_init(int port)
 	imx_iomux_v3_setup_multiple_pads(usb_pads, ARRAY_SIZE(usb_pads));
 #ifdef SNACKERS_BOARD
     /* Select USB Hub default config:  CFG_SEL0 = 0, CFG_SEL1=0 */
-    gpio_direction_output(IMX_GPIO_NR(4, 12), 0);
+    gpio_direction_output(IMX_GPIO_NR(3, 17), 0);
     gpio_direction_output(IMX_GPIO_NR(5, 29), 0);
 
 	/* Reset USB hub */
@@ -703,13 +703,16 @@ int board_eth_init(bd_t *bis)
 
 int splash_screen_prepare(void)
 {
+    printf("splash_screen_prepare\n");
 	char *env_loadsplash;
 
 	if (!getenv("splashimage") || !getenv("splashsize")) {
+        printf("!getenv(splashimage) || !getenv(splashsize)\n");
 		return -1;
 	}
 
 	env_loadsplash = getenv("loadsplash");
+    printf("%s\n", env_loadsplash);
 	if (env_loadsplash == NULL) {
 		printf("Environment variable loadsplash not found!\n");
 		return -1;
@@ -1259,15 +1262,6 @@ int board_early_init_f(void)
 	gpio_direction_input(WL12XX_WL_IRQ_GP);
 #endif
 
-#if 0
-#ifdef SNACKERS_BOARD
-    /* Make sure all SPI bus 1 signals are inputs for now.  TODO: remove later. */
-	gpio_direction_input(IMX_GPIO_NR(4,6));
-	gpio_direction_input(IMX_GPIO_NR(4,7));
-	gpio_direction_input(IMX_GPIO_NR(4,8));
-	gpio_direction_input(IMX_GPIO_NR(4,9));
-#endif
-#endif
 	imx_iomux_v3_setup_multiple_pads(init_pads, ARRAY_SIZE(init_pads));
 #ifndef SNACKERS_BOARD
 	setup_buttons();
@@ -1454,6 +1448,7 @@ int board_late_init(void)
 {
 	int cpurev = get_cpu_rev();
 	setenv("cpu",get_imx_type((cpurev & 0xFF000) >> 12));
+
 	if (0 == getenv("board"))
 		setenv("board",board_type);
 
@@ -1474,6 +1469,13 @@ int board_late_init(void)
 	}
 	else
 	    setenv("usbotgboot", "no");
+
+#ifdef SNACKERS_BOARD
+	setenv("splashimage", "12000000");
+	setenv("splashsize",  "119436");
+	setenv("splashpos",   "m,m");
+    splash_screen_prepare();
+#endif
 
 	return 0;
 }
