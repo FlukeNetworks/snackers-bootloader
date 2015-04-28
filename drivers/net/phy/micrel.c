@@ -206,7 +206,11 @@ static struct phy_driver ksz9031_driver = {
 	.uid  = 0x221620,
 	.mask = 0xfffff0,
 	.features = PHY_GBIT_FEATURES,
+#ifdef SNACKERS_BOARD
+	.config = &ksz9021_config,
+#else
 	.config   = &genphy_config,
+#endif    
 	.startup  = &ksz90xx_startup,
 	.shutdown = &genphy_shutdown,
 	.writeext = &ksz9031_phy_extwrite,

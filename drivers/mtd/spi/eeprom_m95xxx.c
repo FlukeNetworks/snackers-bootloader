@@ -25,13 +25,25 @@
 #define CONFIG_SYS_SPI_WRITE_TOUT (5 * CONFIG_SYS_HZ)
 #endif
 
+#ifdef SNACKERS_BOARD
+#define CONFIG_DEFAULT_SPI_BUS 1
+#define EEPROM_CS              0
+#define SPI_CLOCK_RATE  10000000
+#endif
+
 ssize_t spi_read(uchar *addr, int alen, uchar *buffer, int len)
 {
 	struct spi_slave *slave;
 	u8 cmd = SPI_EEPROM_READ;
 
+#ifdef SNACKERS_BOARD
+	slave = spi_setup_slave(CONFIG_DEFAULT_SPI_BUS, EEPROM_CS, SPI_CLOCK_RATE,
+			CONFIG_DEFAULT_SPI_MODE);
+#else
 	slave = spi_setup_slave(CONFIG_DEFAULT_SPI_BUS, 1, 1000000,
 			CONFIG_DEFAULT_SPI_MODE);
+#endif
+
 	if (!slave)
 		return 0;
 
@@ -65,8 +77,14 @@ ssize_t spi_write(uchar *addr, int alen, uchar *buffer, int len)
 	char buf[3];
 	ulong start;
 
+#ifdef SNACKERS_BOARD
+	slave = spi_setup_slave(CONFIG_DEFAULT_SPI_BUS, EEPROM_CS, SPI_CLOCK_RATE,
+			CONFIG_DEFAULT_SPI_MODE);
+#else
 	slave = spi_setup_slave(CONFIG_DEFAULT_SPI_BUS, 1, 1000000,
 			CONFIG_DEFAULT_SPI_MODE);
+#endif
+
 	if (!slave)
 		return 0;
 
