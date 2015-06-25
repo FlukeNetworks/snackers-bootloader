@@ -75,15 +75,16 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #ifdef SNACKERS_BOARD
 /* LKD GPIO definitions */
-#define BACKLIGHT_EN_GP  IMX_GPIO_NR(1, 11)
-#define PHY_RESET_GP     IMX_GPIO_NR(1, 25)
-#define POE_ENABLE_GP    IMX_GPIO_NR(6,  1)
-#define SYS_RESET_B_GP   IMX_GPIO_NR(3, 19)
-#define SPI_EEPROM_CS_GP IMX_GPIO_NR(2, 26)
-#define SPI_FLASH_CS_GP  IMX_GPIO_NR(3, 24)
-#define USB_OTG_POWER_GP IMX_GPIO_NR(4, 15)
-#define USB_HUB_RESET_GP IMX_GPIO_NR(5, 28)
-#define BT_POWER_GP      IMX_GPIO_NR(7, 5)
+#define BACKLIGHT_EN_GP        IMX_GPIO_NR(1, 11)
+#define PHY_RESET_GP           IMX_GPIO_NR(1, 25)
+#define POE_ENABLE_GP          IMX_GPIO_NR(6,  1)
+#define SYS_RESET_B_GP         IMX_GPIO_NR(3, 19)
+#define SPI_EEPROM_CS_GP       IMX_GPIO_NR(2, 26)
+#define SPI_TEMP_SENSOR_CS_GP  IMX_GPIO_NR(2, 27)
+#define SPI_FLASH_CS_GP        IMX_GPIO_NR(3, 24)
+#define USB_OTG_POWER_GP       IMX_GPIO_NR(4, 15)
+#define USB_HUB_RESET_GP       IMX_GPIO_NR(5, 28)
+#define BT_POWER_GP            IMX_GPIO_NR(7, 5)
 #endif /* SNACKERS_BOARD */
 
 int dram_init(void)
@@ -165,7 +166,7 @@ static struct i2c_pads_info i2c_pad_info1 = {
 	}
 };
 
-/* I2C3: Battery, Touch Panel, USB Hub */
+/* I2C3: Touch Panel, USB Hub */
 static struct i2c_pads_info i2c_pad_info2 = {
 	.scl = {
 		.i2c_mode = MX6_PAD_EIM_D17__I2C3_SCL | PC,
@@ -173,9 +174,9 @@ static struct i2c_pads_info i2c_pad_info2 = {
 		.gp = IMX_GPIO_NR(3, 17)
 	},
 	.sda = {
-		.i2c_mode = MX6_PAD_EIM_D18__I2C3_SDA | PC,
-		.gpio_mode = MX6_PAD_EIM_D18__GPIO3_IO18 | PC,
-		.gp = IMX_GPIO_NR(3, 18)
+		.i2c_mode = MX6_PAD_GPIO_16__I2C3_SDA | PC,
+		.gpio_mode = MX6_PAD_GPIO_16__GPIO7_IO11 | PC,
+		.gp = IMX_GPIO_NR(7, 11)
 	}
 };
 /***************************************************************************************/
@@ -293,13 +294,13 @@ static iomux_v3_cfg_t const enet_pads1[] = {
 	/* pin 35 - 1 (PHY_AD2) on reset */
 	MX6_PAD_RGMII_RXC__GPIO6_IO30		| MUX_PAD_CTRL(NO_PAD_CTRL),
 	/* pin 32 - 1 - (MODE0) all */
-	MX6_PAD_RGMII_RD0__GPIO6_IO25		| MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_RGMII_RD0__GPIO6_IO25		| MUX_PAD_CTRL(PAD_CTL_DSE_40ohm),
 	/* pin 31 - 1 - (MODE1) all */
-	MX6_PAD_RGMII_RD1__GPIO6_IO27		| MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_RGMII_RD1__GPIO6_IO27		| MUX_PAD_CTRL(PAD_CTL_DSE_40ohm),
 	/* pin 28 - 1 - (MODE2) all */
-	MX6_PAD_RGMII_RD2__GPIO6_IO28		| MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_RGMII_RD2__GPIO6_IO28		| MUX_PAD_CTRL(PAD_CTL_DSE_40ohm),
 	/* pin 27 - 1 - (MODE3) all */
-	MX6_PAD_RGMII_RD3__GPIO6_IO29		| MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_RGMII_RD3__GPIO6_IO29		| MUX_PAD_CTRL(PAD_CTL_DSE_40ohm),
 	/* pin 33 - 1 - (CLK125_EN) 125Mhz clockout enabled */
 	MX6_PAD_RGMII_RX_CTL__GPIO6_IO24	| MUX_PAD_CTRL(NO_PAD_CTRL),
 	/* pin 42 PHY nRST */
@@ -376,13 +377,20 @@ static void setup_iomux_enet(void)
 	gpio_direction_output(IMX_GPIO_NR(1, 25), 0); /* Assert PHY rst */
 	imx_iomux_v3_setup_multiple_pads(enet_pads1, ARRAY_SIZE(enet_pads1));
 
-	/* Need delay 10ms according to KSZ9021 spec */
+	gpio_direction_output(IMX_GPIO_NR(6, 25), 1);
+	gpio_direction_output(IMX_GPIO_NR(6, 27), 1);
+	gpio_direction_output(IMX_GPIO_NR(6, 28), 1);
+	gpio_direction_output(IMX_GPIO_NR(6, 29), 1);
+
+	/* Implement the same delay as in the KSZ9021 case */
 	udelay(1000 * 10);
 	gpio_set_value(IMX_GPIO_NR(1, 25), 1); /* Deassert PHY reset */
 
+    udelay(1000 * 10);
 	imx_iomux_v3_setup_multiple_pads(enet_pads2, ARRAY_SIZE(enet_pads2));
 	udelay(100);	/* Wait 100 us before using mii interface */
-/***************************************************************************************/
+
+	/***************************************************************************************/
 
 #else
 	gpio_direction_output(IMX_GPIO_NR(3, 23), 0); /* SABRE Lite PHY rst */
@@ -557,9 +565,16 @@ int board_spi_cs_gpio(unsigned bus, unsigned cs)
     {
         return SPI_FLASH_CS_GP;
     }
-    else if (bus == 1 && cs == 0)
+    else if (bus == 1)
     {
-        return SPI_EEPROM_CS_GP;
+        if (cs == 0)
+        {
+            return SPI_EEPROM_CS_GP;
+        }
+        else if (cs == 1)
+        {
+            return SPI_TEMP_SENSOR_CS_GP;
+        }
     }
     else
     {
@@ -574,8 +589,9 @@ int board_spi_cs_gpio(unsigned bus, unsigned cs)
 /***************************************************************************************/
 
 static iomux_v3_cfg_t const ecspi2_pads[] = {
-	/* SS0: EEPROM */
-	MX6_PAD_EIM_RW__GPIO2_IO26   | MUX_PAD_CTRL(NO_PAD_CTRL),
+	
+	MX6_PAD_EIM_RW__GPIO2_IO26   | MUX_PAD_CTRL(NO_PAD_CTRL), /* SS0: EEPROM */
+	MX6_PAD_EIM_LBA__GPIO2_IO27  | MUX_PAD_CTRL(NO_PAD_CTRL), /* SS1: Temp Sensor */
 	MX6_PAD_EIM_OE__ECSPI2_MISO  | MUX_PAD_CTRL(SPI_PAD_CTRL),
 	MX6_PAD_EIM_CS1__ECSPI2_MOSI | MUX_PAD_CTRL(SPI_PAD_CTRL),
 	MX6_PAD_EIM_CS0__ECSPI2_SCLK | MUX_PAD_CTRL(SPI_PAD_CTRL),
