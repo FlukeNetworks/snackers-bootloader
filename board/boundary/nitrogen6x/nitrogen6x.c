@@ -1485,14 +1485,14 @@ int board_late_init(void)
 	}
 	else
 	    setenv("usbotgboot", "no");
-
+#if 0
 #ifdef SNACKERS_BOARD
 	setenv("splashimage", "12000000");
 	setenv("splashsize",  "119436");
 	setenv("splashpos",   "m,m");
     splash_screen_prepare();
 #endif
-
+#endif
 	return 0;
 }
 
