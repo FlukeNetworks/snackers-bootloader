@@ -180,6 +180,11 @@
 #define CONFIG_VIDEO_BMP_RLE8
 #define CONFIG_SPLASH_SCREEN
 #define CONFIG_SPLASH_SCREEN_ALIGN
+#ifdef SNACKERS_BOARD
+/* The text initially displayed on the LCD,
+   before the Linux kernel splashscreen. */
+#define CONFIG_VIDEO_BOOT_STRING "Powering On ..."
+#endif 
 
  #define CONFIG_VIDEO_BMP_GZIP
 #ifdef CONFIG_VIDEO_BMP_GZIP

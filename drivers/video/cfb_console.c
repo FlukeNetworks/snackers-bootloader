@@ -2225,7 +2225,11 @@ static int video_init(void)
 #else
 	if (!board_cfb_skip()){
 		video_console_address = video_fb_address;
+#ifdef CONFIG_VIDEO_BOOT_STRING  /* Snackers config option */
+		video_drawstring(VIDEO_FONT_WIDTH, 0, (uchar *)CONFIG_VIDEO_BOOT_STRING);
+#else
 		video_drawstring(VIDEO_FONT_WIDTH, 0, (uchar *)version_string);
+#endif
 	}
 #endif
 
