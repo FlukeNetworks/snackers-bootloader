@@ -57,6 +57,7 @@
 
 #ifdef SNACKERS_BOARD
 #define CONFIG_SPI_FLASH_MICRON
+#define CONFIG_CMD_MFG_TEST
 #else
 #define CONFIG_SPI_FLASH_SST
 #endif /* SNACKERS_BOARD */

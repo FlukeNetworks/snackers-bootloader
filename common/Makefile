@@ -66,6 +66,7 @@ obj-$(CONFIG_ENV_IS_IN_UBI) += env_ubi.o
 obj-$(CONFIG_ENV_IS_NOWHERE) += env_nowhere.o
 
 # command
+obj-$(CONFIG_CMD_MFG_TEST) += cmd_mfg_test.o
 obj-$(CONFIG_CMD_AES) += cmd_aes.o
 obj-$(CONFIG_CMD_AMBAPP) += cmd_ambapp.o
 obj-$(CONFIG_SOURCE) += cmd_source.o
