@@ -234,66 +234,6 @@ static ulong mfg_mem_test(vu_long *buf, ulong start_addr, ulong end_addr,
 		addr[test_offset] = pattern;
 	}
 
-	/*
-	 * Description: Test the integrity of a physical
-	 *		memory device by performing an
-	 *		increment/decrement test over the
-	 *		entire region. In the process every
-	 *		storage bit in the device is tested
-	 *		as a zero and a one. The base address
-	 *		and the size of the region are
-	 *		selected by the caller.
-	 *
-	 * Returns:     0 if the test succeeds, 1 if the test fails.
-	 */
-	num_words++;
-
-	/*
-	 * Fill memory with a known pattern.
-	 */
-	for (pattern = 1, offset = 0; offset < num_words; pattern++, offset++) {
-		WATCHDOG_RESET();
-		addr[offset] = pattern;
-	}
-
-	/*
-	 * Check each location and invert it for the second pass.
-	 */
-	for (pattern = 1, offset = 0; offset < num_words; pattern++, offset++) {
-		WATCHDOG_RESET();
-		temp = addr[offset];
-		if (temp != pattern) {
-			printf("\nFAILURE (read/write) @ 0x%.8lx:"
-				" expected 0x%.8lx, actual 0x%.8lx)\n",
-				start_addr + offset*sizeof(vu_long),
-				pattern, temp);
-			errs++;
-			if (ctrlc())
-				return -1;
-		}
-
-		anti_pattern = ~pattern;
-		addr[offset] = anti_pattern;
-	}
-
-	/*
-	 * Check each location for the inverted pattern and zero it.
-	 */
-	for (pattern = 1, offset = 0; offset < num_words; pattern++, offset++) {
-		WATCHDOG_RESET();
-		anti_pattern = ~pattern;
-		temp = addr[offset];
-		if (temp != anti_pattern) {
-			printf("\nFAILURE (read/write): @ 0x%.8lx:"
-				" expected 0x%.8lx, actual 0x%.8lx)\n",
-				start_addr + offset*sizeof(vu_long),
-				anti_pattern, temp);
-			errs++;
-			if (ctrlc())
-				return -1;
-		}
-		addr[offset] = 0;
-	}
 
 	return 0;
 }
