@@ -235,6 +235,16 @@ const char *bootdelay_process(void)
 	unsigned long bootlimit = 0;
 #endif /* CONFIG_BOOTCOUNT_LIMIT */
 
+#ifdef SNACKERS_BOARD
+    // if we have "run_mfg_test" defined, run the manufacturing test and then reboot.
+    if (getenv("run_mfg_test"))
+    {
+        s = "mfg_test; setenv run_mfg_test; saveenv; reset";
+        return s;
+    }
+
+#endif
+
 #ifdef CONFIG_BOOTCOUNT_LIMIT
 	bootcount = bootcount_load();
 	bootcount++;
