@@ -1469,6 +1469,9 @@ int board_late_init(void)
 		setenv("board",board_type);
 
 	struct src *src_regs = (struct src *) SRC_BASE_ADDR;
+    printf("SMBR2 register value: %.8x\n", src_regs->sbmr2);
+    printf("SMBR2 & 0x03000000  : %.8x\n", (src_regs->sbmr2 & 0x03000000));
+
 	if((src_regs->sbmr2 & 0x03000000) == 0x01000000) {
 	    setenv("usbotgboot", "yes");
 	    setenv("console", "console=ttymxc1,115200");
