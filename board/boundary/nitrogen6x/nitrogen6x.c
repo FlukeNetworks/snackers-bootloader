@@ -35,6 +35,9 @@
 #include <usb/ehci-fsl.h>
 #include "spi_display.h"
 
+// we use crc32 to check whether or not the progfuses script is loaded into memory
+extern uint32_t crc32 (uint32_t, const unsigned char *, unsigned int);
+
 DECLARE_GLOBAL_DATA_PTR;
 #ifdef SNACKERS_BOARD
 #define GP_USB_OTG_PWR	IMX_GPIO_NR(4, 15)
@@ -1460,6 +1463,40 @@ int misc_init_r(void)
 	return 0;
 }
 
+// determine whether or not we are booting from board init
+bool booting_board_init(void)
+{
+    uint32_t crc;
+
+	struct src *src_regs = (struct src *) SRC_BASE_ADDR;
+    printf("SMBR2 register value: %.8x\n", src_regs->sbmr2);
+    printf("SMBR2 & 0x03000000  : %.8x\n", (src_regs->sbmr2 & 0x03000000));
+
+    // turns out this register is not reliable. don't use it for board init.
+	// return ((src_regs->sbmr2 & 0x03000000) == 0x01000000);
+
+    /*
+    // check the contents of 0x10cc0000 -- if this matches our progfuses image,
+    // execute it.
+    crc = crc32(0, 0x10cc0000, 2195);
+    printf("CRC of 0x10cc0000: %u (hex: 0x%.8x)\n", crc, crc);
+
+    return (crc == 0x6521125d);
+    */
+
+    // read address 0x10cf0000, if we are in board init we would have written
+    // the magic md5sum of "snackers" there. when we're done, we make sure to
+    // overwrite it to prevent false-positives if this memory isn't overwritten
+    // by the next time we boot.
+    const char* magic_md5 = "294e6b9d0b4341dc320aead4413a823c";
+    char* ptr = 0x10cf0000;
+    bool board_init = (0 == memcmp(magic_md5, ptr, 32));
+
+    // now destroy the evidence
+    memcpy(ptr, "abcdefghijklmnopqrstuvwxyz012346", 32);
+    return board_init;
+}
+
 int board_late_init(void)
 {
 	int cpurev = get_cpu_rev();
@@ -1468,11 +1505,8 @@ int board_late_init(void)
 	if (0 == getenv("board"))
 		setenv("board",board_type);
 
-	struct src *src_regs = (struct src *) SRC_BASE_ADDR;
-    printf("SMBR2 register value: %.8x\n", src_regs->sbmr2);
-    printf("SMBR2 & 0x03000000  : %.8x\n", (src_regs->sbmr2 & 0x03000000));
-
-	if((src_regs->sbmr2 & 0x03000000) == 0x01000000) {
+    if (booting_board_init())
+    {
 	    setenv("usbotgboot", "yes");
 	    setenv("console", "console=ttymxc1,115200");
 	    setenv("wait_mode", "enable_wait_mode=off");
@@ -1480,21 +1514,18 @@ int board_late_init(void)
                                "rootwait root=/dev/ram rw "
                                "g_ether.host_addr=00:c0:17:00:00:01 "
                                "g_ether.dev_addr=00:c0:17:00:00:02 usbotgboot");
-#ifdef SNACKERS_BOARD
+
 	    setenv("bootcmd", "source 0x10cc0000; bootm 0x10800000 0x10d00000");
-#else
-        setenv("bootcmd", "bootm 0x10800000 0x10d00000");
-#endif
 	}
 	else
+    {
 	    setenv("usbotgboot", "no");
+    }
 #if 0
-#ifdef SNACKERS_BOARD
 	setenv("splashimage", "12000000");
 	setenv("splashsize",  "119436");
 	setenv("splashpos",   "m,m");
     splash_screen_prepare();
-#endif
 #endif
 	return 0;
 }
