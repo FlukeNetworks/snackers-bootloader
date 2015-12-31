@@ -6,5 +6,5 @@
 # SPDX-License-Identifier:	GPL-2.0+
 #
 
-obj-y  := nitrogen6x.o
+obj-y  := nitrogen6x.o netscout_logo.o
 obj-$(CONFIG_MXC_SPI_DISPLAY) += spi_display.o

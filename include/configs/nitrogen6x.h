@@ -184,7 +184,7 @@
 #ifdef SNACKERS_BOARD
 /* The text initially displayed on the LCD,
    before the Linux kernel splashscreen. */
-#define CONFIG_VIDEO_BOOT_STRING "Powering On ..."
+#define CONFIG_VIDEO_BOOT_STRING ""
 #endif 
 
  #define CONFIG_VIDEO_BMP_GZIP

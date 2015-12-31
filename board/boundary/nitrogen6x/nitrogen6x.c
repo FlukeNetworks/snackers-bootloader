@@ -35,6 +35,8 @@
 #include <usb/ehci-fsl.h>
 #include "spi_display.h"
 
+extern char netscout_logo_bitmap[];
+
 // we use crc32 to check whether or not the progfuses script is loaded into memory
 extern uint32_t crc32 (uint32_t, const unsigned char *, unsigned int);
 
@@ -1331,7 +1333,6 @@ int board_init(void)
 #ifdef CONFIG_CMD_SATA
 	setup_sata();
 #endif
-
 	return 0;
 }
 
@@ -1521,12 +1522,13 @@ int board_late_init(void)
     {
 	    setenv("usbotgboot", "no");
     }
-#if 0
-	setenv("splashimage", "12000000");
-	setenv("splashsize",  "119436");
-	setenv("splashpos",   "m,m");
-    splash_screen_prepare();
-#endif
+
+	/* Netscout logo
+	 * 60x60 bitmap, 480x800 display.
+	 *  480/2 - 60/2 = 210 (centered horizontally)
+	 *  800/2 - 60/2 = 370 (centered vertically) */
+	bmp_display(netscout_logo_bitmap, 210, 370);
+
 	return 0;
 }
 
