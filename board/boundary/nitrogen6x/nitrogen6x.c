@@ -1291,6 +1291,7 @@ int board_early_init_f(void)
 #if defined(CONFIG_VIDEO_IPUV3)
 	setup_display();
 #endif
+
 	return 0;
 }
 
@@ -1333,6 +1334,25 @@ int board_init(void)
 #ifdef CONFIG_CMD_SATA
 	setup_sata();
 #endif
+
+#ifdef CONFIG_SYS_DCACHE_OFF
+    printf("DCACHE OFF\n");
+#else
+    printf("DCACHE ON\n");
+#endif
+
+#ifdef CONFIG_SYS_ICACHE_OFF
+    printf("ICACHE OFF\n");
+#else
+    printf("ICACHE ON\n");
+#endif
+
+    char* ptr = 0x10cf0000;
+    printf("0x10cf0000:          0x%.8x%.8x%.8x%.8x\n",
+			( ((int*)ptr)[0] ),
+			( ((int*)ptr)[1] ),
+			( ((int*)ptr)[2] ),
+			( ((int*)ptr)[3] ));
 	return 0;
 }
 
@@ -1491,15 +1511,52 @@ bool booting_board_init(void)
     // by the next time we boot.
     const char* magic_md5 = "294e6b9d0b4341dc320aead4413a823c";
     char* ptr = 0x10cf0000;
-    bool board_init = (0 == memcmp(magic_md5, ptr, 32));
+	int result = memcmp(magic_md5, ptr, 32);
+    bool board_init = (0 == result);
+
+	// printf("magic_md5 address: %.8x\n", magic_md5);
+
+	/*
+	printf("memcmp result: %d\n", result);
+	printf("board init: %s\n", (board_init ? "T" : "F"));
+    printf("0x10cf0000:          0x%.8x%.8x%.8x%.8x\n",
+			( ((int*)ptr)[0] ),
+			( ((int*)ptr)[1] ),
+			( ((int*)ptr)[2] ),
+			( ((int*)ptr)[3] ));
+			*/
+	/*
+    printf("magic_md5:           0x%.8x%.8x%.8x%.8x\n",
+			( ((int*)magic_md5)[0] ),
+			( ((int*)magic_md5)[1] ),
+			( ((int*)magic_md5)[2] ),
+			( ((int*)magic_md5)[3] ));
+			*/
 
     // now destroy the evidence
     memcpy(ptr, "abcdefghijklmnopqrstuvwxyz012346", 32);
+
+	/*
+    printf("0x10cf0000, cleared: 0x%.8x%.8x%.8x%.8x\n",
+			( ((int*)ptr)[0] ),
+			( ((int*)ptr)[1] ),
+			( ((int*)ptr)[2] ),
+			( ((int*)ptr)[3] ));
+			*/
+
+
     return board_init;
+
+	// const char* boot_mode = get_boot_mode();
+	// printf("boot mode: %s\n", boot_mode);
+	// return (0 == strcmp(boot_mode, "USB OTG"));
 }
 
 int board_late_init(void)
 {
+
+    // printf("board_late_init()\n");
+
 	int cpurev = get_cpu_rev();
 	setenv("cpu",get_imx_type((cpurev & 0xFF000) >> 12));
 
@@ -1508,6 +1565,7 @@ int board_late_init(void)
 
     if (booting_board_init())
     {
+	    setenv("progfuses", "yes");
 	    setenv("usbotgboot", "yes");
 	    setenv("console", "console=ttymxc1,115200");
 	    setenv("wait_mode", "enable_wait_mode=off");
@@ -1516,11 +1574,27 @@ int board_late_init(void)
                                "g_ether.host_addr=00:c0:17:00:00:01 "
                                "g_ether.dev_addr=00:c0:17:00:00:02 usbotgboot");
 
-	    setenv("bootcmd", "source 0x10cc0000; bootm 0x10800000 0x10d00000");
+		// printf("**** current bootcmd: %s\n", getenv("bootcmd"));
+
+        // the following bootcmd expects:
+        //      progfuses image to be at 0x10cc0000
+        //      uImage (linux kernel) to be at 0x10800000
+        //      min root fs at 0x10d00000
+        //
+        //      see loader.py for more details. this python script pushes
+        //      these files over to these magic addresses, then we execute
+        //      them here
+        //
+	    // setenv("bootcmd", "source 0x10cc0000; bootm 0x10800000 0x10d00000");
+
+        // as above, but without any linux kernel or root file system.
+        //
+	    // setenv("bootcmd", "source 0x10cc0000");
 	}
 	else
     {
 	    setenv("usbotgboot", "no");
+	    setenv("progfuses", "no");
     }
 
 	/* Netscout logo

@@ -236,10 +236,26 @@ const char *bootdelay_process(void)
 #endif /* CONFIG_BOOTCOUNT_LIMIT */
 
 #ifdef SNACKERS_BOARD
+
+    // printf("bootdelay_process()\n");
+
     // if we have "run_mfg_test" defined, run the manufacturing test and then reboot.
     if (getenv("run_mfg_test"))
     {
+        printf("executing mfg test...\n");
         s = "mfg_test; setenv run_mfg_test; saveenv; reset";
+        return s;
+    }
+
+    // if we previously set "progfuses" then run progfuses script and reboot
+	const char* progfuses = getenv("progfuses");
+	printf("progfuses value: %s\n", progfuses);
+    if ( (0 == strcmp(progfuses, "yes")))
+    {
+		setenv("progfuses", NULL);
+		// printf("**** current bootcmd (before sourcing progfuses): %s\n", getenv("bootcmd"));
+        printf("executing progfuses script at 0x10cc0000...\n");
+        s = "source 0x10cc0000; echo \"Boot fuses programmed. Remove power for 2 seconds and then boot back up.\"";
         return s;
     }
 
