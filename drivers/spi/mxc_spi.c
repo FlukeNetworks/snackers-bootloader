@@ -244,7 +244,12 @@ int spi_xchg_single(struct spi_slave *slave, unsigned int bitlen,
 	 */
 	if (bitlen % 32) {
 		data = 0;
+#if 1 // KLL_MOD
+                /* NETSCOUT fix for arbitrary bitlen */
+                cnt = DIV_ROUND_UP(bitlen % 32, 8);
+#else
 		cnt = (bitlen % 32) / 8;
+#endif
 		if (dout) {
 			for (i = 0; i < cnt; i++) {
 				data = (data << 8) | (*dout++ & 0xFF);
@@ -301,7 +306,12 @@ int spi_xchg_single(struct spi_slave *slave, unsigned int bitlen,
 
 	if (bitlen % 32) {
 		data = reg_read(&regs->rxdata);
+#if 1 // KLL_MOD
+                /* NETSCOUT fix for arbitrary bitlen */
+                cnt = DIV_ROUND_UP(bitlen % 32, 8);
+#else
 		cnt = (bitlen % 32) / 8;
+#endif
 		data = cpu_to_be32(data) >> ((sizeof(data) - cnt) * 8);
 		debug("SPI Rx unaligned: 0x%x\n", data);
 		if (din) {
@@ -344,6 +354,26 @@ int spi_xfer(struct spi_slave *slave, unsigned int bitlen, const void *dout,
 	if (flags & SPI_XFER_BEGIN)
 		spi_cs_activate(slave);
 
+#if 1 // KLL_MOD
+	while (n_bytes > 0) {
+		/* NETSCOUT fix for arbitrary bitlen */
+		if (bitlen % 32) {
+			n_bits = bitlen % 32;
+			blk_size = DIV_ROUND_UP(n_bits, 8);
+			bitlen = 0;
+		}
+		else {
+			if (n_bytes < MAX_SPI_BYTES)
+				blk_size = n_bytes;
+			else
+				blk_size = MAX_SPI_BYTES;
+
+			n_bits = blk_size * 8;
+		}
+
+		ret = spi_xchg_single(slave, n_bits, p_outbuf, p_inbuf, 0);
+
+#else
 	while (n_bytes > 0) {
 		if (n_bytes < MAX_SPI_BYTES)
 			blk_size = n_bytes;
@@ -353,6 +383,7 @@ int spi_xfer(struct spi_slave *slave, unsigned int bitlen, const void *dout,
 		n_bits = blk_size * 8;
 
 		ret = spi_xchg_single(slave, n_bits, p_outbuf, p_inbuf, 0);
+#endif
 
 		if (ret)
 			return ret;

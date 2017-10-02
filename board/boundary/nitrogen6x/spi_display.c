@@ -15,6 +15,7 @@
 #include <asm/imx-common/video.h>
 #include <spi.h>
 #include "spi_display.h"
+#include <i2c.h> // KLL_MOD
 
 #define DI0_PAD_CTRL	PAD_CTL_DSE_120ohm
 
@@ -86,7 +87,56 @@ static iomux_v3_cfg_t const spi_display_pads[] = {
 	IOMUX_PAD_CTRL(DISP0_DAT23__IPU1_DISP0_DATA23, DI0_PAD_CTRL),
 };
 
+#if 1 // KLL_MOD
+/* NVD ILI9806E uses 9-bit SPI */
+#define LCM_SpiWriteCmd(x)  0x00, (x)
+#define LCM_SpiWriteData(x) 0x01, (x)
+#define LCM_SpiWriteEnd     0x02
+#endif
+
+#if 1 // KLL_MOD
+int auo_detect_spi(struct display_info_t const *dev)
+{
+	/* NVD touch controller responds immediately (i2c bus 2, addr 0x38) */
+	/* AUO touch controller requires more delay (i2c bus 2 addr 0x3a) */
+	int i;
+	i2c_set_bus_num(2);
+	for (i=0; i<20; ++i) {
+		if (i2c_probe(0x38) == 0) {
+			printf("KLL_DEBUG> %s: nvd detected %dms\n", __func__, i);
+			debug("%s: nvd detected %dms\n", __func__, i);
+			return 0;
+		}
+		if (i2c_probe(0x3a) == 0) {
+			printf("KLL_DEBUG> %s: auo detected %dms\n", __func__, i);
+			debug("%s: auo detected %dms\n", __func__, i);
+			return detect_spi(dev);
+		}
+		mdelay(1);
+	}
+	debug("%s: timeout %dms\n", __func__, i);
+	return 0;
+}
+
 static int spi_display_cmds(struct spi_slave *spi, u8 *cmds)
+{
+        int ret = 0;
+
+printf("KLL_DEBUG> new display 2017-10-02: %s\n", __func__); // KLL_MOD
+
+        debug("%s\n", __func__);
+        for (/*null*/; *cmds < LCM_SpiWriteEnd; cmds += 2) {
+                ret = spi_xfer(spi, 9, cmds, NULL, SPI_XFER_BEGIN | SPI_XFER_END);
+                if (ret) {
+                        debug("%s: write failed %#02x,%#02x, %d\n", __func__, cmds[0], cmds[1], ret);
+                        return ret;
+                }
+                udelay(2);
+        }
+        return ret;
+}
+
+static int auo_spi_display_cmds(struct spi_slave *spi, u8 *cmds)
 {
 	u8 buf[4];
 	int ret = 0;
@@ -134,10 +184,384 @@ static int spi_display_cmds(struct spi_slave *spi, u8 *cmds)
 	}
 	return ret;
 }
+#endif
+
+#if 1 // KLL_MOD
+static u8 display_init_cmds[] = {
+	LCM_SpiWriteCmd(0xFF),
+	LCM_SpiWriteData(0xFF),
+	LCM_SpiWriteData(0x98),
+	LCM_SpiWriteData(0x06),
+	LCM_SpiWriteData(0x04),
+	LCM_SpiWriteData(0x01),  /* Page 1 Command Set */
+
+	LCM_SpiWriteCmd(0x08),
+	LCM_SpiWriteData(0x18),
+
+	LCM_SpiWriteCmd(0x21),
+	LCM_SpiWriteData(0x01),
+
+	LCM_SpiWriteCmd(0x30),
+	LCM_SpiWriteData(0x01),
+
+	LCM_SpiWriteCmd(0x31),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0x40),
+	LCM_SpiWriteData(0x10),
+
+	LCM_SpiWriteCmd(0x41),
+	LCM_SpiWriteData(0x77),
+
+	LCM_SpiWriteCmd(0x42),
+	LCM_SpiWriteData(0x03),
+
+	LCM_SpiWriteCmd(0x43),
+	LCM_SpiWriteData(0x89),
+
+	LCM_SpiWriteCmd(0x44),
+	LCM_SpiWriteData(0x86),
+
+	LCM_SpiWriteCmd(0x50),
+	LCM_SpiWriteData(0x78),
+
+	LCM_SpiWriteCmd(0x51),
+	LCM_SpiWriteData(0x78),
+
+	LCM_SpiWriteCmd(0x52),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0x53),
+	LCM_SpiWriteData(0x3a),
+
+	LCM_SpiWriteCmd(0x57),
+	LCM_SpiWriteData(0x50),
+
+	LCM_SpiWriteCmd(0x60),
+	LCM_SpiWriteData(0x07),
+
+	LCM_SpiWriteCmd(0x61),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0x62),
+	LCM_SpiWriteData(0x08),
+
+	LCM_SpiWriteCmd(0x63),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0xA0),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0xA1),
+	LCM_SpiWriteData(0x07),
+
+	LCM_SpiWriteCmd(0xA2),
+	LCM_SpiWriteData(0x0a),
+
+	LCM_SpiWriteCmd(0xA3),
+	LCM_SpiWriteData(0x0b),
+
+	LCM_SpiWriteCmd(0xA4),
+	LCM_SpiWriteData(0x04),
+
+	LCM_SpiWriteCmd(0xA5),
+	LCM_SpiWriteData(0x08),
+
+	LCM_SpiWriteCmd(0xA6),
+	LCM_SpiWriteData(0x06),
+
+	LCM_SpiWriteCmd(0xA7),
+	LCM_SpiWriteData(0x04),
+
+	LCM_SpiWriteCmd(0xA8),
+	LCM_SpiWriteData(0x07),
+
+	LCM_SpiWriteCmd(0xA9),
+	LCM_SpiWriteData(0x0a),
+
+	LCM_SpiWriteCmd(0xAA),
+	LCM_SpiWriteData(0x12),
+
+	LCM_SpiWriteCmd(0xAB),
+	LCM_SpiWriteData(0x07),
+
+	LCM_SpiWriteCmd(0xAC),
+	LCM_SpiWriteData(0x0d),
+
+	LCM_SpiWriteCmd(0xAD),
+	LCM_SpiWriteData(0x1d),
+
+	LCM_SpiWriteCmd(0xAE),
+	LCM_SpiWriteData(0x16),
+
+	LCM_SpiWriteCmd(0xAF),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0xC0),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0xC1),
+	LCM_SpiWriteData(0x07),
+
+	LCM_SpiWriteCmd(0xC2),
+	LCM_SpiWriteData(0x0a),
+
+	LCM_SpiWriteCmd(0xC3),
+	LCM_SpiWriteData(0x0b),
+
+	LCM_SpiWriteCmd(0xC4),
+	LCM_SpiWriteData(0x04),
+
+	LCM_SpiWriteCmd(0xC5),
+	LCM_SpiWriteData(0x08),
+
+	LCM_SpiWriteCmd(0xC6),
+	LCM_SpiWriteData(0x06),
+
+	LCM_SpiWriteCmd(0xC7),
+	LCM_SpiWriteData(0x04),
+
+	LCM_SpiWriteCmd(0xC8),
+	LCM_SpiWriteData(0x07),
+
+	LCM_SpiWriteCmd(0xC9),
+	LCM_SpiWriteData(0x0a),
+
+	LCM_SpiWriteCmd(0xCA),
+	LCM_SpiWriteData(0x12),
+
+	LCM_SpiWriteCmd(0xCB),
+	LCM_SpiWriteData(0x07),
+
+	LCM_SpiWriteCmd(0xCC),
+	LCM_SpiWriteData(0x0d),
+
+	LCM_SpiWriteCmd(0xCD),
+	LCM_SpiWriteData(0x1d),
+
+	LCM_SpiWriteCmd(0xCE),
+	LCM_SpiWriteData(0x16),
+
+	LCM_SpiWriteCmd(0xCF),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0xFF),
+	LCM_SpiWriteData(0xFF),
+	LCM_SpiWriteData(0x98),
+	LCM_SpiWriteData(0x06),
+	LCM_SpiWriteData(0x04),
+	LCM_SpiWriteData(0x06),  /* Page 6 Command Set */
+
+	LCM_SpiWriteCmd(0x00),
+	LCM_SpiWriteData(0x21),
+
+	LCM_SpiWriteCmd(0x01),
+	LCM_SpiWriteData(0x09),
+
+	LCM_SpiWriteCmd(0x02),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0x03),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0x04),
+	LCM_SpiWriteData(0x01),
+
+	LCM_SpiWriteCmd(0x05),
+	LCM_SpiWriteData(0x01),
+
+	LCM_SpiWriteCmd(0x06),
+	LCM_SpiWriteData(0x80),
+
+	LCM_SpiWriteCmd(0x07),
+	LCM_SpiWriteData(0x05),
+
+	LCM_SpiWriteCmd(0x08),
+	LCM_SpiWriteData(0x02),
+
+	LCM_SpiWriteCmd(0x09),
+	LCM_SpiWriteData(0x80),
+
+	LCM_SpiWriteCmd(0x0A),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0x0B),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0x0C),
+	LCM_SpiWriteData(0x0a),
+
+	LCM_SpiWriteCmd(0x0D),
+	LCM_SpiWriteData(0x0a),
+
+	LCM_SpiWriteCmd(0x0E),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0x0F),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0x10),
+	LCM_SpiWriteData(0xE0),
+
+	LCM_SpiWriteCmd(0x11),
+	LCM_SpiWriteData(0xE4),
+
+	LCM_SpiWriteCmd(0x12),
+	LCM_SpiWriteData(0x04),
+
+	LCM_SpiWriteCmd(0x13),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0x14),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0x15),
+	LCM_SpiWriteData(0xC0),
+
+	LCM_SpiWriteCmd(0x16),
+	LCM_SpiWriteData(0x08),
+
+	LCM_SpiWriteCmd(0x17),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0x18),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0x19),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0x1A),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0x1B),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0x1C),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0x1D),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0x20),
+	LCM_SpiWriteData(0x01),
+
+	LCM_SpiWriteCmd(0x21),
+	LCM_SpiWriteData(0x23),
+
+	LCM_SpiWriteCmd(0x22),
+	LCM_SpiWriteData(0x45),
+
+	LCM_SpiWriteCmd(0x23),
+	LCM_SpiWriteData(0x67),
+
+	LCM_SpiWriteCmd(0x24),
+	LCM_SpiWriteData(0x01),
+
+	LCM_SpiWriteCmd(0x25),
+	LCM_SpiWriteData(0x23),
+
+	LCM_SpiWriteCmd(0x26),
+	LCM_SpiWriteData(0x45),
+
+	LCM_SpiWriteCmd(0x27),
+	LCM_SpiWriteData(0x67),
+
+	LCM_SpiWriteCmd(0x30),
+	LCM_SpiWriteData(0x01),
+
+	LCM_SpiWriteCmd(0x31),
+	LCM_SpiWriteData(0x11),
+
+	LCM_SpiWriteCmd(0x32),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0x33),
+	LCM_SpiWriteData(0xee),
+
+	LCM_SpiWriteCmd(0x34),
+	LCM_SpiWriteData(0xff),
+
+	LCM_SpiWriteCmd(0x35),
+	LCM_SpiWriteData(0xBB),
+
+	LCM_SpiWriteCmd(0x36),
+	LCM_SpiWriteData(0xcA),
+
+	LCM_SpiWriteCmd(0x37),
+	LCM_SpiWriteData(0xDD),
+
+	LCM_SpiWriteCmd(0x38),
+	LCM_SpiWriteData(0xaC),
+
+	LCM_SpiWriteCmd(0x39),
+	LCM_SpiWriteData(0x76),
+
+	LCM_SpiWriteCmd(0x3A),
+	LCM_SpiWriteData(0x67),
+
+	LCM_SpiWriteCmd(0x3B),
+	LCM_SpiWriteData(0x22),
+
+	LCM_SpiWriteCmd(0x3C),
+	LCM_SpiWriteData(0x22),
+
+	LCM_SpiWriteCmd(0x3D),
+	LCM_SpiWriteData(0x22),
+
+	LCM_SpiWriteCmd(0x3E),
+	LCM_SpiWriteData(0x22),
+
+	LCM_SpiWriteCmd(0x3F),
+	LCM_SpiWriteData(0x22),
+
+	LCM_SpiWriteCmd(0x40),
+	LCM_SpiWriteData(0x22),
+
+	LCM_SpiWriteCmd(0x52),
+	LCM_SpiWriteData(0x10),
+
+	LCM_SpiWriteCmd(0x53),
+	LCM_SpiWriteData(0x10),
+
+	LCM_SpiWriteCmd(0xFF),
+	LCM_SpiWriteData(0xFF),
+	LCM_SpiWriteData(0x98),
+	LCM_SpiWriteData(0x06),
+	LCM_SpiWriteData(0x04),
+	LCM_SpiWriteData(0x07), /* Page 7 Command Set */
+
+	LCM_SpiWriteCmd(0x17),
+	LCM_SpiWriteData(0x22),
+
+	LCM_SpiWriteCmd(0x02),
+	LCM_SpiWriteData(0x77),
+
+	LCM_SpiWriteCmd(0xe1),
+	LCM_SpiWriteData(0x79),
+
+	LCM_SpiWriteCmd(0x26),
+	LCM_SpiWriteData(0xb2),
+
+	LCM_SpiWriteCmd(0xFF),
+	LCM_SpiWriteData(0xFF),
+	LCM_SpiWriteData(0x98),
+	LCM_SpiWriteData(0x06),
+	LCM_SpiWriteData(0x04),
+	LCM_SpiWriteData(0x00), /* Page 0 Command Set */
+
+	LCM_SpiWriteCmd(0x3A),
+	LCM_SpiWriteData(0x70),
+
+	LCM_SpiWriteCmd(0x36),
+	LCM_SpiWriteData(0x00),
+
+	LCM_SpiWriteCmd(0x11),
+	LCM_SpiWriteEnd
+};
 
 #define A(reg, cnt) (reg >> 8), (reg & 0xff), cnt
 
-static u8 display_init_cmds[] = {
+static u8 auo_display_init_cmds[] = {
 /* Display Mode Setting */
 	A(0xf000, 5), 0x55, 0xaa, 0x52, 0x08, 0x00,
 	A(0xb100, 2), 0x0c, 0x00,
@@ -181,11 +605,19 @@ static u8 display_init_cmds[] = {
 	A(0x1100, 0),	/* exit sleep mode, wait 120 ms */
 	A(0, 0)
 };
+#endif
 
+#if 1 // KLL_MOD
 static u8 display_on_cmds[] = {
+        LCM_SpiWriteCmd(0x29),
+        LCM_SpiWriteEnd
+};
+
+static u8 auo_display_on_cmds[] = {
 	A(0x2900, 0),
 	A(0, 0)
 };
+#endif
 
 void enable_spi_rgb(struct display_info_t const *dev)
 {
@@ -197,6 +629,36 @@ void enable_spi_rgb(struct display_info_t const *dev)
 
 	struct spi_slave *spi;
 	int ret;
+
+#if 1 // KLL_MOD
+        /* save resolution for bootargs (see common/image_android.c) */
+        char res_str[16];
+        sprintf(res_str, "%dx%d", dev->mode.xres, dev->mode.yres);
+        int err = setenv("res", res_str);
+        printf("KLL_DEBUG> %s: setenv res %s\n", __func__, res_str);
+#endif
+
+#if 0 // KLL_MOD -- KLL_TODO this is currently broken
+        /* insert screen resolution - kernel finds matching panel */
+        char commandline[200] = "";
+        char *res_env = getenv("res");
+        char *videoargs = getenv("videoargs");
+
+        strcpy(commandline, videoargs);
+
+        if (res_env && strcmp(res_env, "480x854")==0) {
+                char newDisplayName[20] = "NVD_HSD050";
+                int name_len = strlen(newDisplayName);
+                char *sptr = strstr(commandline, "dev=lcd,");
+                if (sptr) {
+                        sptr = strchr(sptr, ',');
+                        memmove(sptr + 1 + name_len, sptr, strlen(sptr) + 1);
+                        memcpy(sptr + 1, newDisplayName, name_len);
+                }
+        }
+        err = setenv("videoargs", commandline);
+        printf("KLL_DEBUG> %s: setenv videoargs \"%s\"\n", __func__, commandline);
+#endif
 
 	gpio_direction_output(GP_BACKLIGHT, 1);
 	gpio_direction_output(cs_gpio, 1);
@@ -271,6 +733,64 @@ int detect_spi(struct display_info_t const *dev)
 	mdelay(200);
 	return 1;
 }
+
+#if 1 // KLL_MOD
+void auo_enable_spi_rgb(struct display_info_t const *dev)
+{
+	unsigned cs_gpio = GP_ECSPI5_CS;
+	struct spi_slave *spi;
+	int ret;
+
+	gpio_direction_output(GP_BACKLIGHT, 1);
+	gpio_direction_output(cs_gpio, 1);
+
+	enable_spi_clk(1, dev->bus);
+
+	/* Setup spi_slave */
+	spi = spi_setup_slave(dev->bus, cs_gpio << 8, 1000000, SPI_MODE_0);
+	if (!spi) {
+		printf("%s: Failed to set up slave\n", __func__);
+		return;
+	}
+
+	/* Claim spi bus */
+	ret = spi_claim_bus(spi);
+	if (ret) {
+		debug("%s: Failed to claim SPI bus: %d\n", __func__, ret);
+		goto free_bus;
+	}
+
+	/*
+	 * Initialization sequence
+	 * 1. Display Mode Settings
+	 * 2. Power Settings
+	 * 3. Gamma Settings
+	 * 4. Sleep Out
+	 * 5. Wait >= 7 frame
+	 * 6. Display on
+	 */
+	ret = auo_spi_display_cmds(spi, auo_display_init_cmds);
+	if (ret) {
+		printf("%s: Failed to display_init_cmds %d\n", __func__, ret);
+		goto release_bus;
+	}
+	mdelay(200);
+	ret = auo_spi_display_cmds(spi, auo_display_on_cmds);
+	if (ret) {
+		printf("%s: Failed to display_on_cmds %d\n", __func__, ret);
+		goto release_bus;
+	}
+	ret = 1;
+
+	/* Release spi bus */
+release_bus:
+	spi_release_bus(spi);
+free_bus:
+	spi_free_slave(spi);
+	enable_spi_clk(0, dev->bus);
+	return;
+}
+#endif
 
 static int do_spid(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {

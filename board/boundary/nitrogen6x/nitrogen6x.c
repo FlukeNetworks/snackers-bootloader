@@ -843,6 +843,34 @@ static void enable_rgb(struct display_info_t const *dev)
 
 struct display_info_t const displays[] = {
 #ifdef CONFIG_MXC_SPI_DISPLAY
+
+#if 1 // KLL_MOD
+//#ifdef YILIAN_AUO_DISPLAY /* must be first */
+      {
+	.bus    = 4,
+	.addr   = 0x70,
+	.pixfmt = IPU_PIX_FMT_RGB24,
+	.detect = auo_detect_spi,
+	.enable = auo_enable_spi_rgb,
+	.mode   = {
+		.name           = "AUO_G050",
+		.refresh        = 60,
+		.xres           = 480,
+		.yres           = 800,
+		.pixclock       = 1000000000/516 * 1000 /836/60, /* 38636 */
+		.left_margin    = 18,
+		.right_margin   = 16,
+		.upper_margin   = 18,
+		.lower_margin   = 16,
+		.hsync_len      = 2,
+		.vsync_len      = 2,
+		.sync           = 0,
+		.vmode          = FB_VMODE_NONINTERLACED
+        },
+      },
+//#endif
+#endif
+
 {
 #ifdef  SNACKERS_BOARD
     /* Use ECSPI5 (bus number = 4) */
@@ -855,10 +883,17 @@ struct display_info_t const displays[] = {
 	.detect	= detect_spi,
 	.enable	= enable_spi_rgb,
 	.mode	= {
+#if 1 // KLL_MOD
+		.name           = "NVD_HSD050", /* HSD050B8W8-C, ILI9806E */
+		.refresh        = 60,
+		.xres           = 480,
+		.yres           = 854,
+#else
 		.name           = "AUO_G050",
 		.refresh        = 60,
 		.xres           = 480,
 		.yres           = 800,
+#endif
 		.pixclock       = 1000000000/516 * 1000 /836/60, /* 38636 */
 		.left_margin    = 18,
 		.right_margin   = 16,
@@ -1492,6 +1527,7 @@ bool booting_board_init(void)
 	struct src *src_regs = (struct src *) SRC_BASE_ADDR;
     printf("SMBR2 register value: %.8x\n", src_regs->sbmr2);
     printf("SMBR2 & 0x03000000  : %.8x\n", (src_regs->sbmr2 & 0x03000000));
+printf("HELLO WORLD!!!\n");
 
     // turns out this register is not reliable. don't use it for board init.
 	// return ((src_regs->sbmr2 & 0x03000000) == 0x01000000);
