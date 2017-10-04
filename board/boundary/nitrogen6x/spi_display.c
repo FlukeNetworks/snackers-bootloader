@@ -94,7 +94,10 @@ static iomux_v3_cfg_t const spi_display_pads[] = {
 #define LCM_SpiWriteEnd     0x02
 #endif
 
+int gNewDisplay = 0;
+
 #if 1 // KLL_MOD
+
 int auo_detect_spi(struct display_info_t const *dev)
 {
 	/* NVD touch controller responds immediately (i2c bus 2, addr 0x38) */
@@ -105,6 +108,7 @@ int auo_detect_spi(struct display_info_t const *dev)
 		if (i2c_probe(0x38) == 0) {
 			printf("KLL_DEBUG> %s: nvd detected %dms\n", __func__, i);
 			debug("%s: nvd detected %dms\n", __func__, i);
+			gNewDisplay = 1;
 			return 0;
 		}
 		if (i2c_probe(0x3a) == 0) {
@@ -114,7 +118,32 @@ int auo_detect_spi(struct display_info_t const *dev)
 		}
 		mdelay(1);
 	}
+	printf("KLL_DEBUG> %s: timeout %dms\n", __func__, i);
 	debug("%s: timeout %dms\n", __func__, i);
+
+#if 1 // read the hardware id from eeprom...
+	{
+		ulong dev_addr = CONFIG_SYS_DEF_EEPROM_ADDR;
+		ulong addr = 0x00100000; // temporary memory address for results
+		ulong off = 0x7fe0; // offset to last 32 bytes in the 32Kbyte EEPROM
+		ulong cnt = 0x20; // read 32 bytes
+		int rcode = 0;
+
+		rcode = eeprom_read (dev_addr, off, (uchar *) addr, cnt);
+		printf("KLL_DEBUG> %s: eeprom_read() reads hwId into memory at 0x00100000\n", __func__);
+
+		uchar *pHwId = (uchar*)(addr + 3); //0x00100003;
+		char szHwId[4+1] = "";
+
+		memcpy(szHwId, pHwId, 4);
+		szHwId[4] = 0;
+		printf("KLL_DEBUG> %s: hwId= %s\n", __func__, szHwId);
+		if ( strcmp(szHwId, "0004") == 0 )
+		{
+			gNewDisplay = 1;
+		}
+	}
+#endif
 	return 0;
 }
 
