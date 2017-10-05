@@ -130,7 +130,7 @@ int auo_detect_spi(struct display_info_t const *dev)
 		int rcode = 0;
 
 		rcode = eeprom_read (dev_addr, off, (uchar *) addr, cnt);
-		printf("KLL_DEBUG> %s: eeprom_read() reads hwId into memory at 0x00100000\n", __func__);
+		//printf("KLL_DEBUG> %s: eeprom_read() reads hwId into memory at 0x00100000\n", __func__);
 
 		uchar *pHwId = (uchar*)(addr + 3); //0x00100003;
 		char szHwId[4+1] = "";
@@ -138,7 +138,9 @@ int auo_detect_spi(struct display_info_t const *dev)
 		memcpy(szHwId, pHwId, 4);
 		szHwId[4] = 0;
 		printf("KLL_DEBUG> %s: hwId= %s\n", __func__, szHwId);
-		if ( strcmp(szHwId, "0004") == 0 )
+		int hwId = (int)simple_strtoul(szHwId, NULL, 10);
+		//if ( strcmp(szHwId, "0004") == 0 )
+		if ( hwId >= 4 )
 		{
 			gNewDisplay = 1;
 		}
@@ -151,7 +153,7 @@ static int spi_display_cmds(struct spi_slave *spi, u8 *cmds)
 {
         int ret = 0;
 
-printf("KLL_DEBUG> new display 2017-10-02: %s\n", __func__); // KLL_MOD
+//printf("KLL_DEBUG> new display 2017-10-02: %s\n", __func__); // KLL_MOD
 
         debug("%s\n", __func__);
         for (/*null*/; *cmds < LCM_SpiWriteEnd; cmds += 2) {
@@ -648,6 +650,43 @@ static u8 auo_display_on_cmds[] = {
 };
 #endif
 
+
+int modifyVideoArgs(char *szVideoargs)
+{
+  char args_mod[200] = "";
+
+  //printf("args_orig: %s\n", szVideoargs);
+  //printf("len videoargs= %d\n", strlen(szVideoargs));
+
+  strcpy(args_mod, szVideoargs);
+  char *pDisplay = strstr(args_mod, "dev=lcd,");
+  if ( !pDisplay )
+    return 1;
+
+  pDisplay += strlen("dev=lcd,");
+  *pDisplay = 0; // truncate remainder of string
+  //printf("args_mod: %s\n", args_mod);
+
+  char *pSuffix = strstr(szVideoargs, ",if=RGB24");
+  if ( !pSuffix )
+    return 1;
+
+  if ( gNewDisplay )
+  {
+    strcat(args_mod, "NVD_HSD050"); // 480x854
+  }
+  else
+  {
+    strcat(args_mod, "AUO_G050");  // 480x800
+  }
+
+  strcat(args_mod, pSuffix); 
+  //printf("args_mod: %s\n", args_mod);
+  strcpy(szVideoargs, args_mod);
+
+  return 0;
+}
+
 void enable_spi_rgb(struct display_info_t const *dev)
 {
 #ifdef SNACKERS_BOARD
@@ -664,29 +703,21 @@ void enable_spi_rgb(struct display_info_t const *dev)
         char res_str[16];
         sprintf(res_str, "%dx%d", dev->mode.xres, dev->mode.yres);
         int err = setenv("res", res_str);
-        printf("KLL_DEBUG> %s: setenv res %s\n", __func__, res_str);
+        //printf("KLL_DEBUG> %s: gNewDisplay= %d\n", __func__, gNewDisplay);
+        //printf("KLL_DEBUG> %s: setenv res %s\n", __func__, res_str);
 #endif
 
-#if 0 // KLL_MOD -- KLL_TODO this is currently broken
-        /* insert screen resolution - kernel finds matching panel */
+#if 1 // KLL_MOD 
         char commandline[200] = "";
-        char *res_env = getenv("res");
         char *videoargs = getenv("videoargs");
-
         strcpy(commandline, videoargs);
 
-        if (res_env && strcmp(res_env, "480x854")==0) {
-                char newDisplayName[20] = "NVD_HSD050";
-                int name_len = strlen(newDisplayName);
-                char *sptr = strstr(commandline, "dev=lcd,");
-                if (sptr) {
-                        sptr = strchr(sptr, ',');
-                        memmove(sptr + 1 + name_len, sptr, strlen(sptr) + 1);
-                        memcpy(sptr + 1, newDisplayName, name_len);
-                }
-        }
+        //char *res_env = getenv("res");
+        //if (res_env && strcmp(res_env, "480x854")==0) gNewDisplay = 1;
+
+	modifyVideoArgs(commandline);
         err = setenv("videoargs", commandline);
-        printf("KLL_DEBUG> %s: setenv videoargs \"%s\"\n", __func__, commandline);
+        //printf("KLL_DEBUG> %s: setenv videoargs \"%s\"\n", __func__, commandline);
 #endif
 
 	gpio_direction_output(GP_BACKLIGHT, 1);

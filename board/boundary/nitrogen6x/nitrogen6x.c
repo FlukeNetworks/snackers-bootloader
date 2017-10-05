@@ -1529,8 +1529,8 @@ bool booting_board_init(void)
 	struct src *src_regs = (struct src *) SRC_BASE_ADDR;
     printf("SMBR2 register value: %.8x\n", src_regs->sbmr2);
     printf("SMBR2 & 0x03000000  : %.8x\n", (src_regs->sbmr2 & 0x03000000));
-printf("HELLO WORLD!!!\n");
-printf("KLL_DEBUG> gNewDisplay= %d\n", gNewDisplay);
+//printf("KLL_DEBUG> bootloader says HELLO WORLD!!!\n");
+//printf("KLL_DEBUG> gNewDisplay= %d\n", gNewDisplay);
 
     // turns out this register is not reliable. don't use it for board init.
 	// return ((src_regs->sbmr2 & 0x03000000) == 0x01000000);
