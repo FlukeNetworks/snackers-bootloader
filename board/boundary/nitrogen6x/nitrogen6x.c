@@ -883,18 +883,11 @@ struct display_info_t const displays[] = {
 	.detect	= detect_spi,
 	.enable	= enable_spi_rgb,
 	.mode	= {
-#if 1 // KLL_MOD
 		.name           = "NVD_HSD050", /* HSD050B8W8-C, ILI9806E */
 		.refresh        = 60,
 		.xres           = 480,
 		.yres           = 854,
-#else
-		.name           = "AUO_G050",
-		.refresh        = 60,
-		.xres           = 480,
-		.yres           = 800,
-#endif
-		.pixclock       = 1000000000/516 * 1000 /836/60, /* 38636 */
+		.pixclock       = 1000000000/516 * 1000 /890/60, /* 36291 */
 		.left_margin    = 18,
 		.right_margin   = 16,
 		.upper_margin   = 18,
