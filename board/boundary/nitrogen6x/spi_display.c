@@ -98,62 +98,61 @@ int gNewDisplay = 0;
 
 #if 1 // KLL_MOD
 
+// returns the hardware version for snackers, as stored in the eeprom
+static int get_snackers_hardware_version() {
+    ulong dev_addr = CONFIG_SYS_DEF_EEPROM_ADDR;
+    ulong addr = 0x00100000; // temporary memory address for results
+    ulong off = 0x7fe0; // offset to last 32 bytes in the 32Kbyte EEPROM
+    ulong cnt = 0x20; // read 32 bytes
+    int rcode = 0;
+
+    rcode = eeprom_read (dev_addr, off, (uchar *) addr, cnt);
+
+    uchar *pHwId = (uchar*)(addr + 3); //0x00100003;
+    char szHwId[4+1] = "";
+
+    memcpy(szHwId, pHwId, 4);
+    szHwId[4] = 0;
+    int hwId = (int)simple_strtoul(szHwId, NULL, 10);
+
+    return hwId;
+}
+
+// init auo display
+static void init_auo_display() {
+
+	unsigned cs_gpio = GP_ECSPI5_CS;
+
+	unsigned reset_gpio = GP_SPI_DISPLAY_RESET;
+
+	debug("%s\n", __func__);
+	gpio_direction_output(cs_gpio, 1);
+	gpio_direction_output(reset_gpio, 1);
+	SETUP_IOMUX_PADS(spi_display_pads);
+	gpio_direction_output(reset_gpio, 0);
+	udelay(200);
+	gpio_direction_output(reset_gpio, 1);
+	mdelay(200);
+}
+
+// auo_detect_spi
 int auo_detect_spi(struct display_info_t const *dev)
 {
-	/* NVD touch controller responds immediately (i2c bus 2, addr 0x38) */
-	/* AUO touch controller requires more delay (i2c bus 2 addr 0x3a) */
-	int i;
-	i2c_set_bus_num(2);
-	for (i=0; i<20; ++i) {
-		if (i2c_probe(0x38) == 0) {
-			printf("KLL_DEBUG> %s: nvd detected %dms\n", __func__, i);
-			debug("%s: nvd detected %dms\n", __func__, i);
-			gNewDisplay = 1;
-			return 0;
-		}
-		if (i2c_probe(0x3a) == 0) {
-			printf("KLL_DEBUG> %s: auo detected %dms\n", __func__, i);
-			debug("%s: auo detected %dms\n", __func__, i);
-			return detect_spi(dev);
-		}
-		mdelay(1);
-	}
-	printf("KLL_DEBUG> %s: timeout %dms\n", __func__, i);
-	debug("%s: timeout %dms\n", __func__, i);
+    int hwId = get_snackers_hardware_version();
 
-#if 1 // read the hardware id from eeprom...
-	{
-		ulong dev_addr = CONFIG_SYS_DEF_EEPROM_ADDR;
-		ulong addr = 0x00100000; // temporary memory address for results
-		ulong off = 0x7fe0; // offset to last 32 bytes in the 32Kbyte EEPROM
-		ulong cnt = 0x20; // read 32 bytes
-		int rcode = 0;
+    if (hwId < 4) {
+        init_auo_display();
 
-		rcode = eeprom_read (dev_addr, off, (uchar *) addr, cnt);
-		//printf("KLL_DEBUG> %s: eeprom_read() reads hwId into memory at 0x00100000\n", __func__);
+        gNewDisplay = 0;
+        return 1;
+    }
 
-		uchar *pHwId = (uchar*)(addr + 3); //0x00100003;
-		char szHwId[4+1] = "";
-
-		memcpy(szHwId, pHwId, 4);
-		szHwId[4] = 0;
-		printf("KLL_DEBUG> %s: hwId= %s\n", __func__, szHwId);
-		int hwId = (int)simple_strtoul(szHwId, NULL, 10);
-		//if ( strcmp(szHwId, "0004") == 0 )
-		if ( hwId >= 4 )
-		{
-			gNewDisplay = 1;
-		}
-	}
-#endif
 	return 0;
 }
 
 static int spi_display_cmds(struct spi_slave *spi, u8 *cmds)
 {
         int ret = 0;
-
-//printf("KLL_DEBUG> new display 2017-10-02: %s\n", __func__); // KLL_MOD
 
         debug("%s\n", __func__);
         for (/*null*/; *cmds < LCM_SpiWriteEnd; cmds += 2) {
@@ -703,8 +702,6 @@ void enable_spi_rgb(struct display_info_t const *dev)
         char res_str[16];
         sprintf(res_str, "%dx%d", dev->mode.xres, dev->mode.yres);
         int err = setenv("res", res_str);
-        //printf("KLL_DEBUG> %s: gNewDisplay= %d\n", __func__, gNewDisplay);
-        //printf("KLL_DEBUG> %s: setenv res %s\n", __func__, res_str);
 #endif
 
 #if 1 // KLL_MOD 
@@ -717,7 +714,6 @@ void enable_spi_rgb(struct display_info_t const *dev)
 
 	modifyVideoArgs(commandline);
         err = setenv("videoargs", commandline);
-        //printf("KLL_DEBUG> %s: setenv videoargs \"%s\"\n", __func__, commandline);
 #endif
 
 	gpio_direction_output(GP_BACKLIGHT, 1);
@@ -773,25 +769,20 @@ free_bus:
 /*
  * Return 1 for successful detection of display
  */
-int detect_spi(struct display_info_t const *dev)
+int nvd_detect_spi(struct display_info_t const *dev)
 {
-#ifdef SNACKERS_BOARD
-	unsigned cs_gpio = GP_ECSPI5_CS;
-#else
-	unsigned cs_gpio = GP_ECSPI2_CS;
-#endif
+    int hwId = get_snackers_hardware_version();
 
-	unsigned reset_gpio = GP_SPI_DISPLAY_RESET;
+    if (hwId >= 4) {
 
-	debug("%s\n", __func__);
-	gpio_direction_output(cs_gpio, 1);
-	gpio_direction_output(reset_gpio, 1);
-	SETUP_IOMUX_PADS(spi_display_pads);
-	gpio_direction_output(reset_gpio, 0);
-	udelay(200);
-	gpio_direction_output(reset_gpio, 1);
-	mdelay(200);
-	return 1;
+        // TODO: NVD specific init?
+        init_auo_display();
+
+        gNewDisplay = 1;
+        return 1;
+    }
+
+	return 0;
 }
 
 #if 1 // KLL_MOD

@@ -880,7 +880,7 @@ struct display_info_t const displays[] = {
 #endif
 	.addr	= 0x70,
 	.pixfmt	= IPU_PIX_FMT_RGB24,
-	.detect	= detect_spi,
+	.detect	= nvd_detect_spi,
 	.enable	= enable_spi_rgb,
 	.mode	= {
 		.name           = "NVD_HSD050", /* HSD050B8W8-C, ILI9806E */
