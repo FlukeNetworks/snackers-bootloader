@@ -16,6 +16,7 @@ const struct spi_flash_params spi_flash_params_table[] = {
 #ifdef SNACKERS_BOARD
 #ifdef CONFIG_SPI_FLASH_MICRON		/* MICRON */
 	{"M25P16",	       0x202015 ,  0x1000,	64 * 1024,    32,	0,	    0 },
+	{"MT25Q",          0x20BA18,  0x0,	64 * 1024,    32,	0,	    0 }, // replacement for M25P16
 #endif
 #endif
 #ifdef CONFIG_SPI_FLASH_ATMEL		/* ATMEL */
