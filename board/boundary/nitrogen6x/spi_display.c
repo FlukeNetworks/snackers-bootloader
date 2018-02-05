@@ -654,7 +654,7 @@ int modifyVideoArgs(char *szVideoargs)
 {
   char args_mod[200] = "";
 
-  printf("args_orig: %s\n", szVideoargs);
+  //printf("args_orig: %s\n", szVideoargs);
   //printf("len videoargs= %d\n", strlen(szVideoargs));
 
   strcpy(args_mod, szVideoargs);
@@ -680,7 +680,7 @@ int modifyVideoArgs(char *szVideoargs)
   }
 
   strcat(args_mod, pSuffix); 
-  printf("args_mod: %s\n", args_mod);
+  //printf("args_mod: %s\n", args_mod);
   strcpy(szVideoargs, args_mod);
 
   return 0;
@@ -791,14 +791,6 @@ void auo_enable_spi_rgb(struct display_info_t const *dev)
 	unsigned cs_gpio = GP_ECSPI5_CS;
 	struct spi_slave *spi;
 	int ret;
-
- 	/* Modify videoargs if the old screen is on */ 
-        char commandline[200] = "";
-        char *videoargs = getenv("videoargs");
-        strcpy(commandline, videoargs);
-
-	modifyVideoArgs(commandline);
-        int err = setenv("videoargs", commandline);
 
 	gpio_direction_output(GP_BACKLIGHT, 1);
 	gpio_direction_output(cs_gpio, 1);
